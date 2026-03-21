@@ -1,0 +1,169 @@
+<div id="recast_settings" class="recast_settings_content">
+    <div class="inline-drawer">
+        <div class="inline-drawer-toggle inline-drawer-header">
+            <div class="flex-container alignitemscenter margin0">
+                <b id="recast_title" title="Recast Post-Processing">Recast Post-Processing</b>
+            </div>
+            <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
+        </div>
+        
+        <div class="inline-drawer-content">
+            <div class="recast_settings_content">
+                <hr>
+
+                <div class="flex-container justifyspacebetween alignitemscenter">
+                    <button id="recast_run_pipeline" class="menu_button flex1" title="Run pipeline on the latest AI message"><span>Run Pipeline Now</span></button>
+                </div>
+
+                <hr>
+
+                <h4 class="textAlignCenter">Global Settings</h4>
+                
+                <label class="checkbox_label" title="Enable the entire Recast pipeline">
+                    <input type="checkbox" id="recast_enabled" />
+                    <span>Enable Pipeline</span>
+                </label>
+                <label class="checkbox_label" title="Automatically run on every new AI generation">
+                    <input type="checkbox" id="recast_autorun" />
+                    <span>Auto-run on generation</span>
+                </label>
+                <label class="checkbox_label" title="Inject the post-processed text back into the context for future messages">
+                    <input type="checkbox" id="recast_inject" />
+                    <span>Inject output back to context</span>
+                </label>
+                <label class="checkbox_label" title="Replace message text immediately, skipping the diff review">
+                    <input type="checkbox" id="recast_replace_inline" />
+                    <span>Skip Diff View</span>
+                </label>
+                <label class="checkbox_label" title="Hide the message text in chat until all passes are complete">
+                    <input type="checkbox" id="recast_hide_until_last" />
+                    <span>Hide until last pass</span>
+                </label>
+                <label class="checkbox_label" title="Print verbose logs to console for debugging">
+                    <input type="checkbox" id="recast_debug_mode" />
+                    <span>Debug Mode</span>
+                </label>
+
+                <div class="flex-container alignitemscenter" style="margin-top: 8px;" title="Skip the pipeline if the message has fewer characters than this value (0 = disabled)">
+                    <span style="min-width: 160px;">Min. Characters (0 = off):</span>
+                    <input type="number" id="recast_min_chars" class="text_pole flex1" value="0" min="0" step="1" />
+                </div>
+
+                <hr>
+
+                <h4 class="textAlignCenter">Presets</h4>
+                <div class="flex-container justifyspacebetween alignitemscenter">
+                    <select id="recast_preset_select" class="flex1 text_pole" title="Select an active preset"></select>
+                    <button id="recast_save_preset" class="menu_button fa-solid fa-save interactable" title="Save new preset" tabindex="0"></button>
+                    <button id="recast_load_preset" class="menu_button fa-solid fa-folder-open interactable" title="Reload current preset" tabindex="0"></button>
+                </div>
+
+                <hr>
+
+                <h4 class="textAlignCenter">Passes (Drag to reorder)</h4>
+                
+                <div id="recast_pass_list">
+                    <!-- Passes will be rendered here -->
+                </div>
+                
+                <div class="flex-container justifyspacebetween alignitemscenter" style="margin-top: 10px;">
+                    <button id="recast_add_pass" class="menu_button flex1 fa-solid fa-plus" title="Add a new pass"><span>Add Pass</span></button>
+                </div>
+                
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Processing Progress Bar -->
+<div id="recast_progress_bar" style="display:none; position: fixed; top: 10px; left: 50%; transform: translateX(-50%); background: var(--SmartThemeBlurTintColor, rgba(34,34,34,0.9)); z-index: 10000; padding: 10px 20px; border-radius: 8px; border: 1px solid var(--SmartThemeBorderColor, #444); box-shadow: 0 4px 8px rgba(0,0,0,0.5); min-width: 300px; text-align: center; backdrop-filter: blur(5px);">
+    <div style="font-weight: bold; margin-bottom: 8px;">Recast Pipeline</div>
+    <div id="recast_progress_text" style="margin-bottom: 8px; font-size: 0.9em; opacity: 0.8;">Initializing...</div>
+    <div style="width: 100%; background: rgba(0,0,0,0.3); border-radius: 4px; height: 8px; overflow: hidden; border: 1px solid rgba(255,255,255,0.1);">
+        <div id="recast_progress_fill" style="width: 0%; height: 100%; background: linear-gradient(90deg, #4a90e2, #a04ae2); transition: width 0.3s ease;"></div>
+    </div>
+</div>
+
+<!-- Diff Viewer Backdrop -->
+<div id="recast_diff_backdrop" style="display:none;"></div>
+
+<!-- Diff Viewer Modal -->
+<div id="recast_diff_modal" style="display:none;">
+    <div class="pf-diff-header">
+        <span class="pf-diff-title"><i class="fa-solid fa-wand-magic-sparkles"></i> Recast — Review Changes</span>
+        <button id="recast_diff_close" class="pf-diff-close-btn" title="Close without accepting"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="pf-diff-body">
+        <div class="pf-diff-panel">
+            <div class="pf-diff-panel-header pf-diff-original-header"><i class="fa-solid fa-file-lines"></i> Original</div>
+            <div id="recast_diff_original_view" class="pf-diff-content"></div>
+        </div>
+        <div class="pf-diff-divider"></div>
+        <div class="pf-diff-panel">
+            <div class="pf-diff-panel-header pf-diff-transformed-header">
+                <i class="fa-solid fa-wand-sparkles"></i> Transformed
+                <span class="pf-diff-edit-hint">(editable)</span>
+            </div>
+            <div id="recast_diff_transformed_view" class="pf-diff-content pf-diff-transformed-content"></div>
+            <textarea id="recast_diff_transformed" class="pf-diff-textarea text_pole"></textarea>
+        </div>
+    </div>
+    <div class="pf-diff-footer">
+        <button id="recast_diff_reject" class="menu_button red_button pf-diff-btn"><i class="fa-solid fa-xmark"></i> Reject</button>
+        <button id="recast_diff_accept" class="menu_button pf-diff-btn pf-diff-accept-btn"><i class="fa-solid fa-check"></i> Accept</button>
+    </div>
+</div>
+
+<!-- Pass Template (Hidden) -->
+<template id="recast_pass_template">
+    <div class="recast-pass-item" style="border: 1px solid var(--SmartThemeBorderColor, #555); padding: 10px; margin-bottom: 5px; border-radius: 5px; background: rgba(0,0,0,0.1);">
+        <div class="recast-pass-header flex-container justifyspacebetween alignitemscenter" style="cursor: grab;">
+            <div class="flex-container alignitemscenter flex1">
+                <i class="fa-solid fa-grip-vertical" style="margin-right: 10px; opacity: 0.5;"></i>
+                <input type="checkbox" class="pass-enabled" checked title="Enable/Disable pass" />
+                <input type="text" class="pass-name text_pole flex1" placeholder="Pass Name" style="margin-left: 5px;" />
+            </div>
+            <div style="display: flex; align-items: center; gap: 2px;">
+                <button class="menu_button pass-toggle-details fa-solid fa-chevron-down" title="Toggle Details"></button>
+                <div style="position: relative; display: inline-block;">
+                    <button class="menu_button pass-menu-btn fa-solid fa-ellipsis-vertical" title="Pass Options"></button>
+                    <div class="pass-menu-dropdown" style="display: none; position: absolute; right: 0; top: 100%; background: var(--SmartThemeBlurTintColor, #2a2a2a); border: 1px solid var(--SmartThemeBorderColor, #555); border-radius: 5px; padding: 8px 10px; z-index: 200; min-width: 170px; box-shadow: 0 4px 8px rgba(0,0,0,0.4); white-space: nowrap;">
+                        <label class="checkbox_label" title="Inject active World Info entries into this pass's system prompt">
+                            <input type="checkbox" class="pass-inject-world-info" />
+                            <span>Inject World Info</span>
+                        </label>
+                        <label class="checkbox_label" title="Replace {{outlet:name}} placeholders in the prompt with matching WI outlet entries">
+                            <input type="checkbox" class="pass-inject-wi-outlets" />
+                            <span>WI Outlets</span>
+                        </label>
+                        <label class="checkbox_label" title="Include the character card in this pass's context">
+                            <input type="checkbox" class="pass-include-char-card" />
+                            <span>Include Character Card</span>
+                        </label>
+                        <label class="checkbox_label" title="Include recent scene context messages in this pass's context">
+                            <input type="checkbox" class="pass-include-scene-context" />
+                            <span>Include Scene Context</span>
+                        </label>
+                    </div>
+                </div>
+                <button class="menu_button pass-remove fa-solid fa-trash red_button" title="Remove Pass"></button>
+            </div>
+        </div>
+        <div class="recast-pass-details" style="display: none; margin-top: 10px;">
+            <div class="flex-container alignitemscenter" style="margin-bottom: 5px;">
+                <span style="min-width: 120px;" title="Messages to include">Context Length:</span>
+                <input type="number" class="pass-context-length text_pole flex1" value="3" min="0" />
+            </div>
+            
+            <div style="margin-bottom: 5px;">
+                <span>Prompt:</span>
+                <textarea class="pass-prompt text_pole" rows="4" style="width: 100%; resize: vertical; margin-top: 5px;"></textarea>
+            </div>
+            
+            <div class="flex-container alignitemscenter">
+                <span style="min-width: 120px;" title="Leave empty to use default connection">Connection:</span>
+                <select class="pass-connection text_pole flex1"></select>
+            </div>
+        </div>
+    </div>
+</template>
