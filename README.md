@@ -86,4 +86,3 @@ AGPL-3.0 LICENSE || Please read LICENSE for more information.
 - Conditional Pass Triggers based on ST-script
 - Adaptative Pass to decide the order and which Passes will be used for the upcoming generation
 - Step Diff Viewer (View how the text changed per step)
-- Stop sequence doesn't trigger pipelines
