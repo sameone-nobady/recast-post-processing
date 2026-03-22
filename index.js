@@ -408,7 +408,9 @@ async function runPipeline(originalText, messageId, skipHide = false) {
         $("#form_sheld").addClass("recast-input-active");
 
         if (!skipHide && extension_settings[extensionName].hide_until_last && currentMessageId !== null) {
-            $(`div[mesid="${currentMessageId}"]`).hide();
+            const mesEl = document.querySelector(`.mes[mesid="${currentMessageId}"]`);
+            const mesTextEl = mesEl?.querySelector('.mes_text');
+            if (mesTextEl) mesTextEl.innerHTML = '';
         }
     }
     
@@ -446,7 +448,8 @@ async function runPipeline(originalText, messageId, skipHide = false) {
                 lastRegexResult = applySTRegex(chunkText) || chunkText;
                 lastRegexTime = now;
             }
-            textToRender = lastRegexResult ? lastRegexResult : chunkText;
+            // Use last computed regex result to substitute for streaming tokens if available
+            textToRender = lastRegexResult || chunkText;
 
             const msg = getST().chat[currentMessageId];
             if (msg) {
@@ -546,9 +549,6 @@ async function runPipeline(originalText, messageId, skipHide = false) {
                 msg.mes = originalText;
                 updateMessageBlock(currentMessageId, msg);
             }
-            if (extension_settings[extensionName].hide_until_last) {
-                $(`div[mesid="${currentMessageId}"]`).show();
-            }
         }
         return undefined;
     }
@@ -566,7 +566,6 @@ async function runPipeline(originalText, messageId, skipHide = false) {
                 updateMessageBlock(currentMessageId, msg);
             }
         }
-        $(`div[mesid="${currentMessageId}"]`).show();
     }
     
     if (extension_settings[extensionName].replace_inline) {
@@ -816,7 +815,46 @@ jQuery(async () => {
         });
 
         // Run pipeline once the message is fully received.
-        st.eventSource.on(st.event_types.MESSAGE_RECEIVED, async (mesId) => {
+    function injectMessageTemplateButton() {
+        const html = `<div title="Run Recast Pipeline on this message" class="mes_button recast-msg-btn interactable fa-solid fa-hand-sparkles" tabindex="0"></div>`;
+        $("#message_template .mes_buttons .extraMesButtons").prepend(html);
+
+        // Inject into any existing messages right now so we don't have to reload
+        $("#chat .mes .extraMesButtons").each(function() {
+            if ($(this).find(".recast-msg-btn").length === 0) {
+                $(this).prepend(html);
+            }
+        });
+    }
+
+    injectMessageTemplateButton();
+
+    $(document).on("click", ".recast-msg-btn", function(e) {
+        e.stopPropagation();
+        if (!extension_settings[extensionName].enabled) {
+            toastr.warning("Recast extension is currently disabled.");
+            return;
+        }
+
+        const mesEl = $(this).closest('.mes');
+        const mesId = mesEl.attr('mesid');
+        const isUser = mesEl.attr('is_user') === 'true';
+
+        if (isUser) {
+            toastr.warning("Recast can only process AI messages.");
+            return;
+        }
+
+        const st = getST();
+        const msg = st.chat[mesId];
+        if (msg) {
+            runPipeline(msg.mes, parseInt(mesId, 10));
+        } else {
+            toastr.warning("Could not find message data.");
+        }
+    });
+
+    st.eventSource.on(st.event_types.MESSAGE_RECEIVED, async (mesId) => {
             if (!extension_settings[extensionName].autorun) return;
             if (!['normal', 'swipe', 'regenerate', 'impersonate'].includes(lastGenerationType)) return;
 
@@ -864,9 +902,6 @@ jQuery(async () => {
                     // Pipeline was skipped — restore the raw streamed content
                     updateMessageBlock(mesId, msg);
                 }
-            } else if (result === undefined && extension_settings[extensionName].hide_until_last) {
-                // Fallback for the non-intercept path: unhide if pipeline was skipped
-                $(`div[mesid="${mesId}"]`).show();
             }
         });
     }
