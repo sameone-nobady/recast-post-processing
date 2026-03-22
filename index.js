@@ -22,7 +22,7 @@ const defaultSettings = {
     autorun: true,
     inject: true,
     replace_inline: false,
-    hide_until_last: false,
+    hide_until_last: true,
     stream_pipeline: true,
     debug_mode: true,
     disable_editable_diff: true,
