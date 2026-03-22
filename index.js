@@ -1,6 +1,8 @@
 import { extension_settings, getContext } from "../../../extensions.js";
 import { showDiffModal, initDiffViewer } from "./diffViewer.js";
-import { saveSettingsDebounced, generateRaw, updateMessageBlock, saveChat } from "../../../../script.js";
+import { saveSettingsDebounced, generateRaw, updateMessageBlock, saveChat, messageFormatting, scrollChatToBottom } from "../../../../script.js";
+import { power_user } from "../../../power-user.js"
+import { applyStreamFadeIn } from "../../../util/stream-fadein.js";
 import { getWorldInfoPrompt } from "../../../world-info.js";
 import { MacrosParser } from "../../../macros.js";
 import { getRegexedString, regex_placement } from "../../regex/engine.js";
@@ -409,12 +411,48 @@ async function runPipeline(originalText, messageId, skipHide = false) {
 
         const shouldStreamInline = (isLastPass || !hideUntilLast) && currentMessageId !== null;
 
+        let lastRegexTime = 0;
+        let lastRegexResult = "";
+        const REGEX_THROTTLE_MS = 1000
+
         const onChunk = shouldStreamInline ? (chunkText) => {
-            const tempResult = applySTRegex(chunkText) || chunkText;
+            const now = performance.now();
+            let textToRender = chunkText;
+
+            // Only run heavy ST Regex passes periodically
+            if (now - lastRegexTime > REGEX_THROTTLE_MS) {
+                lastRegexResult = applySTRegex(chunkText) || chunkText;
+                lastRegexTime = now;
+            }
+            textToRender = lastRegexResult ? lastRegexResult : chunkText;
+
             const msg = getST().chat[currentMessageId];
             if (msg) {
-                msg.mes = tempResult;
-                updateMessageBlock(currentMessageId, msg);
+                msg.mes = textToRender;
+
+                const mesEl = document.querySelector(`#chat .mes[mesid="${currentMessageId}"]`);
+                const mesTextEl = mesEl?.querySelector('.mes_text');
+                
+                if (mesTextEl) {
+                    const formattedText = messageFormatting(
+                        textToRender,
+                        msg.name,
+                        msg.is_system,
+                        msg.is_user,
+                        currentMessageId,
+                        {},
+                        false
+                    );
+
+                    if (power_user && power_user.stream_fade_in) {
+                        applyStreamFadeIn(mesTextEl, formattedText);
+                    } else {
+                        mesTextEl.innerHTML = formattedText;
+                    }
+                    scrollChatToBottom({ waitForFrame: true });
+                } else {
+                    updateMessageBlock(currentMessageId, msg);
+                }
             }
         } : null;
 
@@ -429,12 +467,24 @@ async function runPipeline(originalText, messageId, skipHide = false) {
 
         PassResults[pass.id] = currentText;
 
-        // Ensure final state of the pass is updated if inline replacing but not chunking
-        if (shouldStreamInline && !onChunk) {
+        // Ensure final state of the pass is updated
+        if (shouldStreamInline) {
             const msg = getST().chat[currentMessageId];
             if (msg) {
                 msg.mes = currentText;
-                updateMessageBlock(currentMessageId, msg);
+                if (onChunk && power_user && power_user.stream_fade_in) {
+                    // Update DOM directly one last time to avoid abruptly overwriting the fade-in animation via updateMessageBlock
+                    const mesEl = document.querySelector(`#chat .mes[mesid="${currentMessageId}"]`);
+                    const mesTextEl = mesEl?.querySelector('.mes_text');
+                    if (mesTextEl) {
+                        const formattedText = messageFormatting(currentText, msg.name, msg.is_system, msg.is_user, currentMessageId, {}, false);
+                        applyStreamFadeIn(mesTextEl, formattedText);
+                    } else {
+                        updateMessageBlock(currentMessageId, msg);
+                    }
+                } else {
+                    updateMessageBlock(currentMessageId, msg);
+                }
             }
         }
     }
@@ -726,21 +776,24 @@ jQuery(async () => {
 
             if (isIntercepted) {
                 if (result !== undefined) {
-                    // True streaming is now done directly during the pipeline execution (runPass).
-                    // Just honour the diff/replace-inline setting for the final save.
-                    if (extension_settings[extensionName].replace_inline) {
-                        acceptChanges(result);
-                    } else {
-                        // The UI already shows the streamed result, so we need a rejection callback to revert it
-                        showDiffModal(originalText, result, acceptChanges, () => {
-                            const restoreMsg = getST().chat[mesId];
-                            if (restoreMsg) {
-                                restoreMsg.mes = originalText;
-                                updateMessageBlock(mesId, restoreMsg);
-                                saveChat();
-                            }
-                        });
-                    }
+                    // Allow the final stream fade-in animation some time to complete
+                    setTimeout(() => {
+                        // True streaming is now done directly during the pipeline execution (runPass).
+                        // Just honour the diff/replace-inline setting for the final save.
+                        if (extension_settings[extensionName].replace_inline) {
+                            acceptChanges(result);
+                        } else {
+                            // The UI already shows the streamed result, so we need a rejection callback to revert it
+                            showDiffModal(originalText, result, acceptChanges, () => {
+                                const restoreMsg = getST().chat[mesId];
+                                if (restoreMsg) {
+                                    restoreMsg.mes = originalText;
+                                    updateMessageBlock(mesId, restoreMsg);
+                                    saveChat();
+                                }
+                            });
+                        }
+                    }, 500); // 500ms delay protects the final visual update
                 } else {
                     // Pipeline was skipped — restore the raw streamed content
                     updateMessageBlock(mesId, msg);
