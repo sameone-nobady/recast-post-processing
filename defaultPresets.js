@@ -47,7 +47,7 @@ Return only the corrected text. No explanations, no commentary.`,
                 id: "pass_prose",
                 name: "Prose Rhythm",
                 enabled: true,
-                contextLength: 15,
+                contextLength: 10,
                 prompt: `You are a prose editor. Your only job is to improve how the text reads without changing what it says.
 Rules:
 - Do not change any dialogue. Not a single word.
