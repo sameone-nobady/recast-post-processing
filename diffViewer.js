@@ -59,8 +59,8 @@ function computeWordDiff(oldText, newText) {
     for (const op of ops) {
         const v = escapeHtml(op.v);
         if (op.type === "equal")        { oldHtml += v; newHtml += v; }
-        else if (op.type === "delete")  { oldHtml += `<del class="pf-del">${v}</del>`; }
-        else                            { newHtml += `<ins class="pf-ins">${v}</ins>`; }
+        else if (op.type === "delete")  { oldHtml += `<del class="rc-del">${v}</del>`; }
+        else                            { newHtml += `<ins class="rc-ins">${v}</ins>`; }
     }
 
     return { oldHtml, newHtml };
