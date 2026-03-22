@@ -77,8 +77,11 @@ You can help by submitting bug reports or opening pull requests!
 AGPL-3.0 LICENSE || Please read LICENSE for more information.
 
 ## TO-DO
-
+- Better event registration, response streaming and overall visualization, avoiding conflict with other generations
 - Prefills
 - Text Completion Support
 - Conditional Pass Triggers based on ST-script
+- First Pass to decide the order and which Passes will be used for the upcoming generation
 - Advanced Prompt Control and role management Options
+- Remove editable diffs
+- Stop sequence doesn't trigger pipelines.
