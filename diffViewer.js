@@ -70,6 +70,8 @@ function computeWordDiff(oldText, newText) {
 
 let _acceptCallback = null;
 
+import { extension_settings } from "../../../extensions.js";
+
 export function showDiffModal(originalText, transformedText, onAccept) {
     _acceptCallback = onAccept;
 
@@ -79,6 +81,16 @@ export function showDiffModal(originalText, transformedText, onAccept) {
     $("#recast_diff_original_view").html(oldHtml);
     $("#recast_diff_transformed_view").html(newHtml);
     $("#recast_diff_transformed").val(transformedText);
+
+    if (extension_settings["Recast"] && extension_settings["Recast"].disable_editable_diff) {
+        $("#recast_diff_transformed").hide();
+        $("#recast_diff_transformed_view").css({ "height": "100%", "flex": "1 1 auto" });
+        $(".rc-diff-edit-hint").hide();
+    } else {
+        $("#recast_diff_transformed").show();
+        $("#recast_diff_transformed_view").css({ "height": "", "flex": "" });
+        $(".rc-diff-edit-hint").show();
+    }
 
     $("#recast_diff_backdrop").fadeIn(200);
     $("#recast_diff_modal").fadeIn(220);

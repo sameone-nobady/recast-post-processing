@@ -22,6 +22,7 @@ const defaultSettings = {
     replace_inline: false,
     hide_until_last: false,
     debug_mode: true,
+    disable_editable_diff: true,
     min_chars: 10,
     presets: defaultPresets,
     active_preset: "Default Preset"
@@ -52,6 +53,7 @@ async function loadSettings() {
     $("#recast_replace_inline").prop("checked", extension_settings[extensionName].replace_inline);
     $("#recast_hide_until_last").prop("checked", extension_settings[extensionName].hide_until_last);
     $("#recast_debug_mode").prop("checked", extension_settings[extensionName].debug_mode);
+    $("#recast_disable_editable_diff").prop("checked", extension_settings[extensionName].disable_editable_diff);
     $("#recast_min_chars").val(extension_settings[extensionName].min_chars ?? 0);
 
     populatePresetDropdown();
@@ -65,6 +67,7 @@ function saveSettings() {
     extension_settings[extensionName].replace_inline = $("#recast_replace_inline").prop("checked");
     extension_settings[extensionName].hide_until_last = $("#recast_hide_until_last").prop("checked");
     extension_settings[extensionName].debug_mode = $("#recast_debug_mode").prop("checked");
+    extension_settings[extensionName].disable_editable_diff = $("#recast_disable_editable_diff").prop("checked");
     extension_settings[extensionName].min_chars = parseInt($("#recast_min_chars").val(), 10) || 0;
     
     saveActivePreset();
@@ -500,7 +503,7 @@ jQuery(async () => {
     registerMacros();
     initDiffViewer();
 
-    $("#recast_enabled, #recast_autorun, #recast_inject, #recast_replace_inline, #recast_hide_until_last, #recast_debug_mode").on("change", saveSettings);
+    $("#recast_enabled, #recast_autorun, #recast_inject, #recast_replace_inline, #recast_hide_until_last, #recast_debug_mode, #recast_disable_editable_diff").on("change", saveSettings);
     $("#recast_min_chars").on("input change", saveSettings);
     
     $("#recast_preset_select").on("change", function() {

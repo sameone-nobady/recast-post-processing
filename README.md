@@ -57,6 +57,7 @@ Essentially, this picks up a response, processes it through each pass in your pi
 - **Pass 1: Character Validation** - Use a fast, non-reasoning, emotionally-aware model to ensure the character isn't acting out of themselves.
 - **Pass 2: Prose Refinement** - Use a strong reasoning model to enhance the vocabulary, fix grammar, and elevate the writing style.
 - **Editing Main Prompt** - Remove or edit any bloat that may restrain the model's creativity, including banning words, strict high-quality writing styles, etc. Please save your original prompts beforehand.
+- **Change as you go** - Modifying your main and pass prompts to fullfill your personal preferences is ideal.
 - **Trying out** - Trying out with different main models, both non-reasoning and reasoning ones and also trying them in the pass system is encouraged. Speed and pricing is also something to be considered, since each pass is a different request!
 
 ## 🛠️ Prerequisites
