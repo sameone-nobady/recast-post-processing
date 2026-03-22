@@ -99,7 +99,6 @@ You can help by submitting bug reports or opening pull requests!
 AGPL-3.0 LICENSE || Please read LICENSE for more information.
 
 ## TO-DO
-- Avoid conflict with other generations
 - Advanced Prompt Control, prefills and role management Options
 - Text Completion Support
 - Conditional Pass Triggers based on ST-script

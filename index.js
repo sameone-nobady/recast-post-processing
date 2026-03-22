@@ -45,6 +45,7 @@ let hideNextAiMessage = false;
 let streamInterceptObserver = null;
 let isResettingStream = false;
 let isPipelineCancelled = false;
+let lastGenerationType = null;
 
 // Per-pass results from the last pipeline run, keyed by pass id
 const PassResults = {};
@@ -411,6 +412,8 @@ async function runPipeline(originalText, messageId, skipHide = false) {
         }
     }
     
+    let completedPassesCount = 0;
+
     for (let i = 0; i < enabledPasses.length; i++) {
         if (isPipelineCancelled) {
             logDebug("Pipeline cancelled by user.");
@@ -480,6 +483,14 @@ async function runPipeline(originalText, messageId, skipHide = false) {
         if (isPipelineCancelled) {
             logDebug("Pipeline cancelled during pass execution.");
             currentText = originalText;
+            // Restore original text directly to the DOM if we were streaming inline
+            //if (shouldStreamInline && currentMessageId !== null) {
+                const msg = getST().chat[currentMessageId];
+                if (msg) {
+                    msg.mes = originalText;
+                    updateMessageBlock(currentMessageId, msg);
+                }
+            //}
             break;
         }
 
@@ -492,6 +503,7 @@ async function runPipeline(originalText, messageId, skipHide = false) {
         }
 
         PassResults[pass.id] = currentText;
+        completedPassesCount++;
 
         // Ensure final state of the pass is updated
         if (shouldStreamInline) {
@@ -525,6 +537,20 @@ async function runPipeline(originalText, messageId, skipHide = false) {
             $("#recast_progress_bar").fadeOut(300);
             $("#form_sheld").removeClass("recast-input-active");
         }, 1500);
+    }
+
+    if (completedPassesCount === 0) {
+        if (currentMessageId !== null) {
+            const msg = getST().chat[currentMessageId];
+            if (msg) {
+                msg.mes = originalText;
+                updateMessageBlock(currentMessageId, msg);
+            }
+            if (extension_settings[extensionName].hide_until_last) {
+                $(`div[mesid="${currentMessageId}"]`).show();
+            }
+        }
+        return undefined;
     }
     
     // When skipHide is active, the caller (MESSAGE_RECEIVED) handles typewriter display and saving.
@@ -739,11 +765,12 @@ jQuery(async () => {
 
         // When generation starts, set up interception before any token arrives.
         st.eventSource.on(st.event_types.GENERATION_STARTED, (type, _opts, dryRun) => {
+            lastGenerationType = type;
             if (dryRun) return;
             if (!extension_settings[extensionName].enabled) return;
             if (!extension_settings[extensionName].autorun) return;
             if (!extension_settings[extensionName].hide_until_last) return;
-            if (type === 'impersonate' || type === 'quiet') return;
+            if (!['normal', 'swipe', 'regenerate', 'impersonate'].includes(type)) return;
 
             // Only bother if there are passes that will actually run
             const idx = getActivePresetIndex();
@@ -791,6 +818,7 @@ jQuery(async () => {
         // Run pipeline once the message is fully received.
         st.eventSource.on(st.event_types.MESSAGE_RECEIVED, async (mesId) => {
             if (!extension_settings[extensionName].autorun) return;
+            if (!['normal', 'swipe', 'regenerate', 'impersonate'].includes(lastGenerationType)) return;
 
             const chat = getST().chat;
             const msg = chat[mesId];

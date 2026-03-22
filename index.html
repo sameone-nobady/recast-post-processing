@@ -1,7 +1,7 @@
 <div id="recast_settings" class="recast_settings_content">
     <div class="inline-drawer">
         <div class="inline-drawer-toggle inline-drawer-header">
-            <div class="flex-container alignitemscenter margin0">
+            <div class="flex-container alignitemscenter justifycenter margin0 flex1">
                 <b id="recast_title" title="Recast Post-Processing">Recast Post-Processing</b>
             </div>
             <div class="inline-drawer-icon fa-solid fa-circle-chevron-down down"></div>
@@ -69,7 +69,7 @@
                 <hr>
 
                 <h4 class="textAlignCenter" style="margin-bottom: 2px;">Passes (Runs Top to Bottom)</h4>
-                <div class="textAlignCenter" style="font-size: 0.8em; opacity: 0.7; margin-bottom: 10px;">(Each one is a different API calls)</div>
+                <div class="textAlignCenter" style="font-size: 0.8em; opacity: 0.7; margin-bottom: 10px;">(Each one is a different API call)</div>
                 
                 <div id="recast_pass_list">
                     <!-- Passes will be rendered here -->
@@ -86,13 +86,13 @@
 
 <!-- Processing Progress Bar -->
 <div id="recast_progress_bar" style="display:none;">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-        <div style="font-weight: bold;">→ Recast Pipeline</div>
-        <button id="recast_stop_pipeline" class="menu_button red_button" title="Stop Pipeline" style="padding: 2px 6px; font-size: 0.8em;"><i class="fa-solid fa-stop"></i></button>
+    <div style="display: flex; align-items: center; margin-bottom: 8px; position: relative;">
+        <div style="font-weight: bold; width: 100%; text-align: center;">→ Recast Pipeline</div>
+        <button id="recast_stop_pipeline" class="menu_button red_button" title="Stop Pipeline" style="padding: 2px 6px; font-size: 0.8em; position: absolute; right: 0;"><i class="fa-solid fa-stop"></i></button>
     </div>
     <div id="recast_progress_text" style="margin-bottom: 8px; font-size: 0.9em; opacity: 0.8;">Initializing...</div>
-    <div style="width: 100%; background: rgba(0,0,0,0.3); border-radius: 4px; height: 8px; overflow: hidden; border: 1px solid rgba(255,255,255,0.1);">
-        <div id="recast_progress_fill" style="width: 0%;"></div>
+    <div style="width: 100%; background: rgba(0,0,0,0.3); border-radius: 10px; height: 8px; overflow: hidden; border: 1px solid rgba(255,255,255,0.1);">
+        <div id="recast_progress_fill" style="width: 0%; border-radius: 10px;"></div>
     </div>
 </div>
 
