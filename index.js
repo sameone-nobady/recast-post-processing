@@ -44,6 +44,7 @@ let hideNextAiMessage = false;
 // Intercept observer that blanks streaming tokens into .mes_text while the pipeline is pending
 let streamInterceptObserver = null;
 let isResettingStream = false;
+let isPipelineCancelled = false;
 
 // Per-pass results from the last pipeline run, keyed by pass id
 const PassResults = {};
@@ -381,6 +382,7 @@ async function runPipeline(originalText, messageId, skipHide = false) {
 
     isProcessing = true;
     currentMessageId = messageId;
+    isPipelineCancelled = false;
     
     const idx = getActivePresetIndex();
     if (idx === -1) {
@@ -398,12 +400,20 @@ async function runPipeline(originalText, messageId, skipHide = false) {
         $("#recast_progress_text").text(`Starting pipeline...`);
         $("#recast_progress_fill").css("width", `0%`);
 
+        $("#form_sheld").addClass("recast-input-active");
+
         if (!skipHide && extension_settings[extensionName].hide_until_last && currentMessageId !== null) {
             $(`div[mesid="${currentMessageId}"]`).hide();
         }
     }
     
     for (let i = 0; i < enabledPasses.length; i++) {
+        if (isPipelineCancelled) {
+            logDebug("Pipeline cancelled by user.");
+            currentText = originalText;
+            break;
+        }
+        
         const pass = enabledPasses[i];
         const progressPercent = Math.round(((i) / enabledPasses.length) * 100);
         
@@ -502,6 +512,7 @@ async function runPipeline(originalText, messageId, skipHide = false) {
         $("#recast_progress_text").text(`Pipeline complete!`);
         setTimeout(() => {
             $("#recast_progress_bar").fadeOut(300);
+            $("#form_sheld").removeClass("recast-input-active");
         }, 1500);
     }
     
@@ -741,6 +752,7 @@ jQuery(async () => {
         // If generation is stopped/aborted, clean up the intercept and restore the raw content.
         st.eventSource.on(st.event_types.GENERATION_STOPPED, () => {
             hideNextAiMessage = false;
+            isPipelineCancelled = true;
             if (streamInterceptObserver) {
                 streamInterceptObserver.disconnect();
                 streamInterceptObserver = null;

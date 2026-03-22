@@ -303,3 +303,97 @@ ins.rc-ins {
     width: 100%;
     margin-bottom: 5px;
 }
+
+/* ===== Progress Bar ===== */
+
+#recast_progress_bar {
+    position: fixed;
+    top: 60px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--SmartThemeBlurTintColor, rgba(28, 28, 38, 0.92));
+    z-index: 10000;
+    padding: 12px 22px;
+    border-radius: 10px;
+    border: 1px solid var(--SmartThemeBorderColor, #444);
+    box-shadow: 0 6px 24px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.04);
+    min-width: 300px;
+    text-align: center;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+}
+
+#recast_progress_fill {
+    height: 100%;
+    border-radius: 4px;
+    background: linear-gradient(
+        90deg,
+        #4a90e2 0%,
+        #a04ae2 33%,
+        #4ae2c0 66%,
+        #4a90e2 100%
+    );
+    background-size: 200% 100%;
+    transition: width 0.35s ease;
+    animation: recast-gradient-shift 2.4s linear infinite;
+}
+
+@keyframes recast-gradient-shift {
+    0%   { background-position: 0% 50%; }
+    100% { background-position: 200% 50%; }
+}
+
+/* ===== Input Area Processing Indicator ===== */
+
+/* Ensure the form wrapper can anchor ::before */
+#form_sheld {
+    position: relative;
+}
+
+/* Animated gradient bar that runs across the top of the input box */
+#form_sheld.recast-input-active::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(
+        90deg,
+        transparent  0%,
+        #4a90e2     15%,
+        #9b59b6     50%,
+        #1abc9c     85%,
+        transparent 100%
+    );
+    background-size: 200% 100%;
+    border-radius: 2px 2px 0 0;
+    filter: brightness(1.2);
+    animation: recast-underline-sweep 1.8s linear infinite;
+    pointer-events: none;
+    z-index: 1000;
+}
+
+/* Soft glow emanating downward from the bar into the input area */
+#form_sheld.recast-input-active::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 60px;
+    background: linear-gradient(
+        180deg,
+        rgba(100, 80, 220, 0.1) 0%,
+        transparent 100%
+    );
+    background-size: 200% 100%;
+    animation: recast-underline-sweep 2.4s linear infinite reverse;
+    pointer-events: none;
+    z-index: 999;
+}
+
+@keyframes recast-underline-sweep {
+    0%   { background-position: 100% 50%; }
+    100% { background-position: -100% 50%; }
+}
