@@ -4,26 +4,27 @@
 
 Large language models get better every day, but their performance in multi-tasking and chatting still degrades when keeping track of complex worlds, multiple characters, trackers, and repetition. It gets messy fast. Recast solves this by allowing specific prompts and corrections to be applied *after* the original response is generated, without touching your main prompt.
 
-If you create and edit your prompts often, you notice that there's a ceiling you hit very fast and essentially lack the management abilities to keep up with so many things at the same time while also sounding natural and creative, but what if you could make them all work reliably? The concept of Post-Processing comes in, by breaking down into tasks after the original message was generated, you keep creativity and add restraints after, allowing models to freely create content that will be 'diffused' in the following steps.
+**The Next Generation of Prompt Management:** If you create and edit prompts often, you probably noticed that there is a ceiling you hit very fast and still lacks the abilities to keep up with so many things at once, while also sounding natural and creative. *But what if you could make them all work reliably?* The concept of Post-Processing comes in; By breaking down into tasks *after* the original message was generated you keep creativity and add restraints after, allowing models to freely create content that will be modified in the following steps allowing even more strict prompt control.
+
+⚠️ *This system makes use of multiple API calls, proceed at your own responsability and beware of pricing costs.* ⚠️
 
 ## 🌟 Core Concept
 
 After a message is generated, you can run it through a sequence of independent transformation passes. Each pass takes the previous output, applies a custom prompt via a separate model/API call, and returns the transformed text. 
 
 **Passes are completely independent:**
-- They don't share your main prompt.
+- They don't use your main prompt.
 - They don't share context.
 - They don't know about each other.
-- No reasoning required.
-- They can use entirely different models and connection profiles.
+- They can work even without reasoning, making use entirely different models and connection profiles.
 
-Essentially, this picks up a roleplay response, processes it through each pass in your pipeline, and overwrites it with the final result. With a well made setup, models also start to automatically pickup high-quality prose from previous responses, making everything run even smoother.
+Essentially, this picks up a response, processes it through each pass in your pipeline, and overwrites it with the final result. With a solid setup, models also start to automatically pickup high-quality prose from previous responses.
 
 ## ✨ Features
 
 - **Multi-Pass Pipeline:** Chain multiple prompts together. E.g., Pass 1: "Verify character behavior", Pass 2: "Enhance prose".
 - **Customizeable Passes** Make any prompt for any kind of work, including spicing up the text or adding HTML or XML tags.
-- **Reliable Bans** Ban words, phrases or character behaviors with context awareness and without lobotomizing your model.
+- **Reliable Bans** Ban words, phrases or character behaviors with context awareness and without lobotomizing your model's creativity.
 - **Model Agnostic (Connection Profiles):** Use different models for different tasks! Use an emotionally aware model for character validation, and a reasoning model for prose refinement. *(Requires Connection Profiles)*
 - **ST Features Integration:** Supports injection of Character Cards, World Info, WI Outlets, Macros, and Scene Context into your post-processing passes.
 - **Diff Viewer:** Review, edit, accept, or reject the changes made by the pipeline with a clean side-by-side diff UI.
@@ -56,6 +57,7 @@ Essentially, this picks up a roleplay response, processes it through each pass i
 - **Pass 1: Character Validation** - Use a fast, non-reasoning, emotionally-aware model to ensure the character isn't acting out of themselves.
 - **Pass 2: Prose Refinement** - Use a strong reasoning model to enhance the vocabulary, fix grammar, and elevate the writing style.
 - **Editing Main Prompt** - Remove or edit any bloat that may restrain the model's creativity, including banning words, strict high-quality writing styles, etc. Please save your original prompts beforehand.
+- **Trying out** - Trying out with different main models, both non-reasoning and reasoning ones and also trying them in the pass system is encouraged. Speed and pricing is also something to be considered, since each pass is a different request!
 
 ## 🛠️ Prerequisites
 
@@ -72,4 +74,4 @@ You can help by submitting bug reports or opening pull requests!
 
 ## 📄 License
 
-AGPL-3.0 LICENSE
+AGPL-3.0 LICENSE || Please read LICENSE for more information.
