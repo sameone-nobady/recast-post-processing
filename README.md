@@ -6,7 +6,7 @@
 
 In the near future, LLMs will be accompanied by output post-processing, allowing models to be corrected, realigned or to fulfill specific purposes without being overly instrusive.
 The main problem with LLMs cannot go back once their final response was generated or predict what they will say next, reasoning can help but it's still prone to prompt poisoning, lack of creativity or coherence.
-Post-processing solves that by allowing completely separate system prompts, reasoning chains or smaller models to take over the original response to verify accuracy or improve the quality of the text without being *completely* contextually aware of what the original request was. Make use of what LLMs are the best at: Smaller, clear and direct tasks.
+Post-processing solves that by allowing completely separate system prompts, reasoning chains or smaller models to take over the original response to verify accuracy or improve the quality of the text without being *completely* contextually aware of what the original request was. Making use of what LLMs are the best at: Smaller, clear and direct tasks.
 
 **The Next Generation of Prompt Management:** If you create and edit prompts often, you probably noticed that there is a ceiling you hit very fast and still lacks the abilities to keep up with so many things at once, while *also* sounding natural and creative. *But what if you could make them all work reliably?* The concept of Post-Processing comes in; By breaking down into tasks *after* the original message was generated you keep creativity and add restraints after, allowing models to freely create content that will be modified during post-processing steps. This allows for even more strict prompt control.
 
@@ -30,8 +30,8 @@ Essentially, this picks up a response, processes it through each pass in your pi
 
 - **Force LLMs to comply with strict rules:** Make models respect character personalities, speech, complex prose styles, world rules & systems, banned words/behavior or anything else you may want them to!
 - **Multi-Pass Pipeline:** Chain multiple prompts together. E.g., Pass 1: "Verify character behavior", Pass 2: "Enhance prose".
-- **Customizeable Passes** Make any prompt for any kind of work, including spicing up the text or adding HTML or XML tags.
-- **Reliable Bans** Ban words, phrases or character behaviors with context awareness and without lobotomizing your model's creativity.
+- **Customizeable Passes:** Make any prompt for any kind of work, including spicing up the text or adding HTML or XML tags.
+- **Reliable Bans:** Ban words, phrases or character behaviors with context awareness and without lobotomizing your model's creativity.
 - **Model Agnostic (Connection Profiles):** Use different models for different tasks! Use an emotionally aware model for character validation, and a reasoning model for prose refinement. *(Requires Connection Profiles)*
 - **ST Features Integration:** Supports injection of Character Cards, World Info, WI Outlets, Macros, and Scene Context into your post-processing passes.
 - **Diff Viewer:** Review, edit, accept, or reject the changes made by the pipeline with a clean side-by-side diff UI.
@@ -61,7 +61,7 @@ Essentially, this picks up a response, processes it through each pass in your pi
 5. When the AI generates a response, Recast will process it (if "Auto-run" is on), or you can manually click **Run Pipeline**.
 
 ### Recommended Workflow
-- **Chat Completion** - This extension requires at least one Chat Completion endpoint, but a recommend at least two.
+- **Chat Completion** - This extension requires at least one Chat Completion endpoint, but we recommend at least two.
 - **Pass 1: Character Validation** - Use a fast, non-reasoning, emotionally-aware model to ensure the character isn't acting out of themselves.
 - **Pass 2: Prose Refinement** - Use a strong reasoning model to enhance the vocabulary, fix grammar, and elevate the writing style.
 - **Editing Main Prompt** - Remove or edit any bloat that may restrain the model's creativity, including banning words, strict high-quality writing styles, etc. Please save your original prompts beforehand.
@@ -80,6 +80,19 @@ Contact me through the Discord extension post or Reddit comments on the original
 You can help by submitting bug reports or opening pull requests!
 
 *Special thanks to Qvink for the Connection Profile generation! (github.com/qvink/qvink_memory)*
+*Beautiful custom theme by Rivelle! (https://github.com/RivelleDays/SillyTavern-MoonlitEchoesTheme)*
+
+## Examples
+
+- Claude 4.6 Opus as the Main Model, GLM 5 No reasoning (Validator) and DS 3.2 Reasoning (Prose)
+![Example Image](https://raw.githubusercontent.com/closuretxt/closure-imgdump/refs/heads/main/claude%20opus%204.6.png)
+![Example Image](https://raw.githubusercontent.com/closuretxt/closure-imgdump/refs/heads/main/claude%20opus%204.6%202.png)
+
+- Gemini 2 Lite as the Main Model, GLM 5 No reasoning (Validator) and DS 3.2 Reasoning (Prose)
+![Example Image](https://github.com/closuretxt/closure-imgdump/blob/main/gemini%202%20lite.png)
+
+- Deepseek 3.2 Reasoning, GLM 5 No reasoning (Validator) and DS 3.2 Reasoning (Prose)
+![Example](https://raw.githubusercontent.com/closuretxt/closure-imgdump/refs/heads/main/deepseek%20reasoning.png)
 
 ## 📄 License
 
@@ -92,3 +105,5 @@ AGPL-3.0 LICENSE || Please read LICENSE for more information.
 - Conditional Pass Triggers based on ST-script
 - Adaptative Pass to decide the order and which Passes will be used for the upcoming generation
 - Step Diff Viewer (View how the text changed per step)
+- Tool Calling
+- Addition Type Pass (For Trackers)
