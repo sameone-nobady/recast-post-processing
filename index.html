@@ -86,7 +86,10 @@
 
 <!-- Processing Progress Bar -->
 <div id="recast_progress_bar" style="display:none;">
-    <div style="font-weight: bold; margin-bottom: 8px;">⟳ Recast Pipeline</div>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+        <div style="font-weight: bold;">→ Recast Pipeline</div>
+        <button id="recast_stop_pipeline" class="menu_button red_button" title="Stop Pipeline" style="padding: 2px 6px; font-size: 0.8em;"><i class="fa-solid fa-stop"></i></button>
+    </div>
     <div id="recast_progress_text" style="margin-bottom: 8px; font-size: 0.9em; opacity: 0.8;">Initializing...</div>
     <div style="width: 100%; background: rgba(0,0,0,0.3); border-radius: 4px; height: 8px; overflow: hidden; border: 1px solid rgba(255,255,255,0.1);">
         <div id="recast_progress_fill" style="width: 0%;"></div>

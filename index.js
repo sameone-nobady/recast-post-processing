@@ -24,7 +24,7 @@ const defaultSettings = {
     replace_inline: false,
     hide_until_last: true,
     stream_pipeline: true,
-    debug_mode: true,
+    debug_mode: false,
     disable_editable_diff: true,
     min_chars: 10,
     presets: defaultPresets,
@@ -348,6 +348,10 @@ async function runPass(pass, text, onChunk = null) {
             if (typeof createGenerator === 'function') {
                 const generator = createGenerator();
                 for await (const chunk of generator) {
+                    if (isPipelineCancelled) {
+                        logDebug(`Pass ${pass.name}: stream aborted by isPipelineCancelled.`);
+                        break;
+                    }
                     if (chunk && chunk.text !== undefined) {
                         result = chunk.text; // The generator typically yields the accumulated string so far
                         if (onChunk) {
@@ -472,6 +476,13 @@ async function runPipeline(originalText, messageId, skipHide = false) {
         } : null;
 
         const RawPassResult = await runPass(pass, currentText, onChunk);
+        
+        if (isPipelineCancelled) {
+            logDebug("Pipeline cancelled during pass execution.");
+            currentText = originalText;
+            break;
+        }
+
         const RegexedResult = applySTRegex(RawPassResult);
 
         if (RegexedResult.trim().length === 0) {
@@ -602,6 +613,12 @@ jQuery(async () => {
     const progressBar = tempDiv.find("#recast_progress_bar");
     const diffBackdrop = tempDiv.find("#recast_diff_backdrop");
     const diffModal = tempDiv.find("#recast_diff_modal");
+    
+    // Stop pipeline button
+    progressBar.find("#recast_stop_pipeline").on("click", () => {
+        isPipelineCancelled = true;
+        logDebug("Pipeline cancelled by user via stop button.");
+    });
 
     $("body").append(progressBar);
     $("body").append(diffBackdrop);
