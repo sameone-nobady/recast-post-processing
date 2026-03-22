@@ -69,11 +69,13 @@ function computeWordDiff(oldText, newText) {
 //
 
 let _acceptCallback = null;
+let _rejectCallback = null;
 
 import { extension_settings } from "../../../extensions.js";
 
-export function showDiffModal(originalText, transformedText, onAccept) {
+export function showDiffModal(originalText, transformedText, onAccept, onReject = null) {
     _acceptCallback = onAccept;
+    _rejectCallback = onReject;
 
     const { oldHtml, newHtml } = computeWordDiff(originalText, transformedText);
 
@@ -96,7 +98,10 @@ export function showDiffModal(originalText, transformedText, onAccept) {
     $("#recast_diff_modal").fadeIn(220);
 }
 
-export function hideDiffModal() {
+export function hideDiffModal(isReject = false) {
+    if (isReject && typeof _rejectCallback === "function") {
+        _rejectCallback();
+    }
     $("#recast_diff_backdrop").fadeOut(180);
     $("#recast_diff_modal").fadeOut(200);
 }
@@ -105,12 +110,12 @@ export function initDiffViewer() {
     $("#recast_diff_accept").on("click", () => {
         const text = $("#recast_diff_transformed").val();
         if (typeof _acceptCallback === "function") _acceptCallback(text);
-        hideDiffModal();
+        hideDiffModal(false);
     });
 
-    $("#recast_diff_reject, #recast_diff_close").on("click", () => hideDiffModal());
+    $("#recast_diff_reject, #recast_diff_close").on("click", () => hideDiffModal(true));
 
-    $("#recast_diff_backdrop").on("click", () => hideDiffModal());
+    $("#recast_diff_backdrop").on("click", () => hideDiffModal(true));
 
     // Live diff — recompute highlights as the user edits the transformed textarea
     $("#recast_diff_transformed").on("input", function () {

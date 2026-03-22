@@ -36,6 +36,11 @@ function logDebug(...args) {
 
 let isProcessing = false;
 let currentMessageId = null;
+// Set by GENERATION_STARTED so the MutationObserver can hide the incoming AI message block before streaming
+let hideNextAiMessage = false;
+// Intercept observer that blanks streaming tokens into .mes_text while the pipeline is pending
+let streamInterceptObserver = null;
+let isResettingStream = false;
 
 // Per-pass results from the last pipeline run, keyed by pass id
 const PassResults = {};
@@ -203,7 +208,7 @@ function addPassToUI(pass = null) {
     $("#recast_pass_list").append(item);
 }
 
-async function runPass(pass, text) {
+async function runPass(pass, text, onChunk = null) {
     if (!pass.enabled) return text;
 
     const st = getST();
@@ -321,14 +326,33 @@ async function runPass(pass, text) {
             { role: "user", content: userPrompt }
         ];
 
-        let result;
+        let result = "";
+        
         if (st.ConnectionManagerRequestService && st.ConnectionManagerRequestService.sendRequest) {
-            const rawResponse = await st.ConnectionManagerRequestService.sendRequest(ConnectionProfile, messages);
-            result = typeof rawResponse === 'object' ? rawResponse.content : rawResponse;
-        } else {
-            // Fallback: use generateRaw if Connection Manager is absent
-            const FullPrompt = `${systemPrompt}\n\n${userPrompt}`;
-            result = await generateRaw({ prompt: FullPrompt, api: null });
+            // Get the stream generator by passing stream: true
+            // Passing undefined for maxTokens to allow the model default
+            const createGenerator = await st.ConnectionManagerRequestService.sendRequest(
+                ConnectionProfile, 
+                messages, 
+                undefined, 
+                { stream: true }
+            );
+            
+            if (typeof createGenerator === 'function') {
+                const generator = createGenerator();
+                for await (const chunk of generator) {
+                    if (chunk && chunk.text !== undefined) {
+                        result = chunk.text; // The generator typically yields the accumulated string so far
+                        if (onChunk) {
+                            onChunk(result);
+                        }
+                    }
+                }
+            } else if (createGenerator && typeof createGenerator === 'object') {
+                // If it wasn't a stream or generator failed to stream
+                result = createGenerator.content || createGenerator.text || String(createGenerator);
+                if (onChunk) onChunk(result);
+            }
         }
 
         logDebug("Pass result:", result);
@@ -339,7 +363,7 @@ async function runPass(pass, text) {
     }
 }
 
-async function runPipeline(originalText, messageId) {
+async function runPipeline(originalText, messageId, skipHide = false) {
     if (isProcessing) return;
     if (!extension_settings[extensionName].enabled) return;
 
@@ -368,7 +392,7 @@ async function runPipeline(originalText, messageId) {
         $("#recast_progress_text").text(`Starting pipeline...`);
         $("#recast_progress_fill").css("width", `0%`);
 
-        if (extension_settings[extensionName].hide_until_last && currentMessageId !== null) {
+        if (!skipHide && extension_settings[extensionName].hide_until_last && currentMessageId !== null) {
             $(`div[mesid="${currentMessageId}"]`).hide();
         }
     }
@@ -380,7 +404,21 @@ async function runPipeline(originalText, messageId) {
         $("#recast_progress_text").text(`Pass ${i + 1}/${enabledPasses.length}: ${pass.name}`);
         $("#recast_progress_fill").css("width", `${progressPercent}%`);
         
-        const RawPassResult = await runPass(pass, currentText);
+        const isLastPass = i === enabledPasses.length - 1;
+        const hideUntilLast = extension_settings[extensionName].hide_until_last;
+
+        const shouldStreamInline = (isLastPass || !hideUntilLast) && currentMessageId !== null;
+
+        const onChunk = shouldStreamInline ? (chunkText) => {
+            const tempResult = applySTRegex(chunkText) || chunkText;
+            const msg = getST().chat[currentMessageId];
+            if (msg) {
+                msg.mes = tempResult;
+                updateMessageBlock(currentMessageId, msg);
+            }
+        } : null;
+
+        const RawPassResult = await runPass(pass, currentText, onChunk);
         const RegexedResult = applySTRegex(RawPassResult);
 
         if (RegexedResult.trim().length === 0) {
@@ -391,13 +429,12 @@ async function runPipeline(originalText, messageId) {
 
         PassResults[pass.id] = currentText;
 
-        if (!extension_settings[extensionName].hide_until_last && currentMessageId !== null) {
-            if (extension_settings[extensionName].replace_inline) {
-                const msg = getST().chat[currentMessageId];
-                if (msg) {
-                    msg.mes = currentText;
-                    updateMessageBlock(currentMessageId, msg);
-                }
+        // Ensure final state of the pass is updated if inline replacing but not chunking
+        if (shouldStreamInline && !onChunk) {
+            const msg = getST().chat[currentMessageId];
+            if (msg) {
+                msg.mes = currentText;
+                updateMessageBlock(currentMessageId, msg);
             }
         }
     }
@@ -413,6 +450,11 @@ async function runPipeline(originalText, messageId) {
         }, 1500);
     }
     
+    // When skipHide is active, the caller (MESSAGE_RECEIVED) handles typewriter display and saving.
+    if (skipHide) {
+        return currentText;
+    }
+
     if (extension_settings[extensionName].hide_until_last && currentMessageId !== null) {
         if (extension_settings[extensionName].replace_inline) {
             const msg = getST().chat[currentMessageId];
@@ -432,6 +474,9 @@ async function runPipeline(originalText, messageId) {
     
     return currentText;
 }
+
+
+//
 
 function applySTRegex(text) {
     try {
@@ -564,16 +609,146 @@ jQuery(async () => {
 
     const st = getST();
     if (st.eventSource && st.event_types) {
-    // Run on character message generation
-    st.eventSource.on(st.event_types.MESSAGE_RECEIVED, async (mesId) => {
-        if (!extension_settings[extensionName].autorun) return;
-        
-        const chat = getST().chat;
-        const msg = chat[mesId];
-        
-        if (msg && !msg.is_user) {
-            await runPipeline(msg.mes, mesId);
+        // Helper: attach a MutationObserver on a .mes_text element that blanks any content
+        // update while the pipeline is pending, creating a "char is typing..." visual.
+        function attachStreamIntercept(mesTextEl) {
+            if (streamInterceptObserver) streamInterceptObserver.disconnect();
+            mesTextEl.innerHTML = '';
+            streamInterceptObserver = new MutationObserver(() => {
+                if (isResettingStream) return;
+                isResettingStream = true;
+                mesTextEl.innerHTML = '';
+                isResettingStream = false;
+            });
+            streamInterceptObserver.observe(mesTextEl, { childList: true, subtree: true, characterData: true });
         }
-    });
+
+        // MutationObserver on #chat: intercept the new AI message node the instant it is
+        // added to the DOM (before any streaming token renders) and blank its text.
+        const chatDomEl = document.getElementById('chat');
+        if (chatDomEl) {
+            const chatObserver = new MutationObserver((mutations) => {
+                if (!hideNextAiMessage) return;
+                for (const mutation of mutations) {
+                    for (const node of mutation.addedNodes) {
+                        if (
+                            node.nodeType === Node.ELEMENT_NODE &&
+                            node.classList.contains('mes') &&
+                            node.getAttribute('is_user') !== 'true'
+                        ) {
+                            hideNextAiMessage = false;
+                            const mesTextEl = node.querySelector('.mes_text');
+                            if (mesTextEl) {
+                                attachStreamIntercept(mesTextEl);
+                                logDebug('Recast: stream intercepted on new message — blanking until pipeline done.');
+                            }
+                            return;
+                        }
+                    }
+                }
+            });
+            chatObserver.observe(chatDomEl, { childList: true });
+        }
+
+        // When generation starts, set up interception before any token arrives.
+        st.eventSource.on(st.event_types.GENERATION_STARTED, (type, _opts, dryRun) => {
+            if (dryRun) return;
+            if (!extension_settings[extensionName].enabled) return;
+            if (!extension_settings[extensionName].autorun) return;
+            if (!extension_settings[extensionName].hide_until_last) return;
+            if (type === 'impersonate' || type === 'quiet') return;
+
+            // Only bother if there are passes that will actually run
+            const idx = getActivePresetIndex();
+            if (idx === -1) return;
+            const EnabledPasses = extension_settings[extensionName].presets[idx].passes.filter(p => p.enabled);
+            if (EnabledPasses.length === 0) return;
+
+            if (type === 'swipe' || type === 'regenerate') {
+                // Swipe/regenerate update an existing element — blank its text directly now
+                const st2 = getST();
+                const mesId = st2.chat.length - 1;
+                if (mesId >= 0 && st2.chat[mesId] && !st2.chat[mesId].is_user) {
+                    const mesEl = document.querySelector(`#chat .mes[mesid="${mesId}"]`);
+                    const mesTextEl = mesEl?.querySelector('.mes_text');
+                    if (mesTextEl) {
+                        attachStreamIntercept(mesTextEl);
+                        logDebug(`Recast: stream intercepted on swipe/regenerate mesid=${mesId}.`);
+                    }
+                }
+            } else {
+                // New message: MutationObserver will catch it the instant the DOM node appears
+                hideNextAiMessage = true;
+                logDebug('Recast: set hideNextAiMessage=true for upcoming new AI message.');
+            }
+        });
+
+        // If generation is stopped/aborted, clean up the intercept and restore the raw content.
+        st.eventSource.on(st.event_types.GENERATION_STOPPED, () => {
+            hideNextAiMessage = false;
+            if (streamInterceptObserver) {
+                streamInterceptObserver.disconnect();
+                streamInterceptObserver = null;
+            }
+            if (extension_settings[extensionName].hide_until_last && extension_settings[extensionName].autorun) {
+                const st2 = getST();
+                const mesId = st2.chat.length - 1;
+                if (mesId >= 0 && st2.chat[mesId]) {
+                    updateMessageBlock(mesId, st2.chat[mesId]);
+                    logDebug(`Recast: generation stopped — restored content of mesid=${mesId}.`);
+                }
+            }
+        });
+
+        // Run pipeline once the message is fully received.
+        st.eventSource.on(st.event_types.MESSAGE_RECEIVED, async (mesId) => {
+            if (!extension_settings[extensionName].autorun) return;
+
+            const chat = getST().chat;
+            const msg = chat[mesId];
+            if (!msg || msg.is_user) return;
+
+            // Capture whether streaming was being intercepted (determines the display path)
+            const isIntercepted = streamInterceptObserver !== null;
+            // Save the original (unprocessed) text before the pipeline modifies it
+            const originalText = msg.mes;
+
+            // ST is done streaming — release the intercept lock NOW, before the pipeline runs.
+            // This prevents any timing issue where a pending mutation callback could blank
+            // content that streamResult writes after the pipeline.
+            if (streamInterceptObserver) {
+                streamInterceptObserver.disconnect();
+                streamInterceptObserver = null;
+                logDebug('Recast: stream intercept released at MESSAGE_RECEIVED.');
+            }
+
+            const result = await runPipeline(msg.mes, mesId, isIntercepted);
+
+            if (isIntercepted) {
+                if (result !== undefined) {
+                    // True streaming is now done directly during the pipeline execution (runPass).
+                    // Just honour the diff/replace-inline setting for the final save.
+                    if (extension_settings[extensionName].replace_inline) {
+                        acceptChanges(result);
+                    } else {
+                        // The UI already shows the streamed result, so we need a rejection callback to revert it
+                        showDiffModal(originalText, result, acceptChanges, () => {
+                            const restoreMsg = getST().chat[mesId];
+                            if (restoreMsg) {
+                                restoreMsg.mes = originalText;
+                                updateMessageBlock(mesId, restoreMsg);
+                                saveChat();
+                            }
+                        });
+                    }
+                } else {
+                    // Pipeline was skipped — restore the raw streamed content
+                    updateMessageBlock(mesId, msg);
+                }
+            } else if (result === undefined && extension_settings[extensionName].hide_until_last) {
+                // Fallback for the non-intercept path: unhide if pipeline was skipped
+                $(`div[mesid="${mesId}"]`).show();
+            }
+        });
     }
 });
