@@ -85,19 +85,18 @@ Contact me through the Discord extension post or Reddit comments on the original
 You can help by submitting bug reports or opening pull requests!
 
 *Special thanks to Qvink for the Connection Profile generation! (github.com/qvink/qvink_memory)*
-*Beautiful custom theme by Rivelle! (https://github.com/RivelleDays/SillyTavern-MoonlitEchoesTheme)*
+*Beautiful custom theme - Moonlit Echoes by Rivelle! (https://github.com/RivelleDays/SillyTavern-MoonlitEchoesTheme)*
 
 ## Examples
 
-- Claude 4.6 Opus as the Main Model, GLM 5 No reasoning (Validator) and DS 3.2 Reasoning (Prose)
-
+ - Claude 4.6 Opus as the Main Model, GLM 5 No reasoning (Validator) and DS 3.2 Reasoning (Prose)
 ![Example Image](https://raw.githubusercontent.com/closuretxt/closure-imgdump/refs/heads/main/claude%20opus%204.6.png)
 ![Example Image](https://raw.githubusercontent.com/closuretxt/closure-imgdump/refs/heads/main/claude%20opus%204.6%202.png)
 
-- Gemini 2 Lite as the Main Model, GLM 5 No reasoning (Validator) and DS 3.2 Reasoning (Prose)
+ - Gemini 2 Lite as the Main Model, GLM 5 No reasoning (Validator) and DS 3.2 Reasoning (Prose)
 ![Example Image](https://github.com/closuretxt/closure-imgdump/blob/main/gemini%202%20lite.png)
 
-- Deepseek 3.2 Reasoning, GLM 5 No reasoning (Validator) and DS 3.2 Reasoning (Prose)
+ - Deepseek 3.2 Reasoning, GLM 5 No reasoning (Validator) and DS 3.2 Reasoning (Prose)
 ![Example](https://raw.githubusercontent.com/closuretxt/closure-imgdump/refs/heads/main/deepseek%20reasoning.png)
 
 ## 📄 License
