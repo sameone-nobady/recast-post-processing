@@ -22,6 +22,8 @@ After a message is generated, you can run it through a sequence of independent t
 
 Essentially, this picks up a response, processes it through each pass in your pipeline, and overwrites it with the final result. With a solid setup, models also start to automatically pickup high-quality prose from previous responses.
 
+![Example Image](https://raw.githubusercontent.com/closuretxt/closure-imgdump/refs/heads/main/openrouter%20free%20model.png)
+
 ## ✨ Features
 
 - **Force LLMs to comply with strict rules:** Make models respect character personalities, speech, complex prose styles, world rules & systems, banned words/behavior or anything else you may want them to!
