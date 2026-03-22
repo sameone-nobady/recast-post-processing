@@ -1,5 +1,7 @@
 # Recast | Prose Post-Processing for SillyTavern
 
+⚠️ CURRENTLY UNDER TESTING. I have no idea if it works on different workflows. ⚠️
+
 **Recast** is a SillyTavern extension that adds a highly configurable, multi-pass post-processing pipeline to any AI message output. 
 
 In the near future, LLMs will be accompanied by output post-processing, allowing models to be corrected, realigned or to fulfill specific purposes without being overly instrusive.
