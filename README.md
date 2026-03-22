@@ -2,13 +2,11 @@
 
 **Recast** is a SillyTavern extension that adds a highly configurable, multi-pass post-processing pipeline to any AI message output. 
 
-In the near future, LLMs will be accompanied by output post-processing, allowing models to be corrected, realigned or to fulfill specific purposes without being overly instrusive. The main problem even with reasoning is that LLMs cannot essentially go back once their whole response was generated or predict what they will say in the next token. Post-processing solves that by allowing completely separate system prompts, reasoning chains or smaller models to take over the original final response, allowing them to verify accuracy or improve the quality of it without exactly being *completely* contextually aware of what the original request was.
+In the near future, LLMs will be accompanied by output post-processing, allowing models to be corrected, realigned or to fulfill specific purposes without being overly instrusive. The main problem even with reasoning is that LLMs cannot essentially go back once their final response was generated or predict what they will say next. Post-processing solves that by allowing completely separate system prompts, reasoning chains or smaller models to take over the original response, allowing them to verify accuracy or improve the quality of the text without being *completely* contextually aware of what the original request was. Make use of what LLMs are the best at: Smaller, clear and direct tasks.
 
-Large language models get better every day, but their performance in multi-tasking and chatting still degrades when keeping track of prose quality, repetition complex worlds, multiple characters and trackers. Recast solves this by allowing specific prompts and corrections to be applied *after* the original response is generated, without using your main prompt and making use of what LLMs are the best at: Smaller, clear and direct tasks.
+**The Next Generation of Prompt Management:** If you create and edit prompts often, you probably noticed that there is a ceiling you hit very fast and still lacks the abilities to keep up with so many things at once, while *also* sounding natural and creative. *But what if you could make them all work reliably?* The concept of Post-Processing comes in; By breaking down into tasks *after* the original message was generated you keep creativity and add restraints after, allowing models to freely create content that will be modified during post-processing steps. This allows for even more strict prompt control.
 
-**The Next Generation of Prompt Management:** If you create and edit prompts often, you probably noticed that there is a ceiling you hit very fast and still lacks the abilities to keep up with so many things at once, while also sounding natural and creative. *But what if you could make them all work reliably?* The concept of Post-Processing comes in; By breaking down into tasks *after* the original message was generated you keep creativity and add restraints after, allowing models to freely create content that will be modified in the following steps allowing even more strict prompt control.
-
-⚠️ *This system makes use of multiple API calls, proceed at your own responsability and beware of pricing costs.* ⚠️
+⚠️ *This system makes use of multiple API calls, proceed at your own responsability and beware of usage costs.* ⚠️
 
 ## 🌟 Core Concept
 
@@ -24,6 +22,7 @@ Essentially, this picks up a response, processes it through each pass in your pi
 
 ## ✨ Features
 
+- **Force LLMs to comply with strict rules:** Make models respect character personalities, speech, complex prose styles, world rules & systems, banned words/behavior or anything else you may want them to!
 - **Multi-Pass Pipeline:** Chain multiple prompts together. E.g., Pass 1: "Verify character behavior", Pass 2: "Enhance prose".
 - **Customizeable Passes** Make any prompt for any kind of work, including spicing up the text or adding HTML or XML tags.
 - **Reliable Bans** Ban words, phrases or character behaviors with context awareness and without lobotomizing your model's creativity.
@@ -56,6 +55,7 @@ Essentially, this picks up a response, processes it through each pass in your pi
 5. When the AI generates a response, Recast will process it (if "Auto-run" is on), or you can manually click **Run Pipeline**.
 
 ### Recommended Workflow
+- **Chat Completion** - This extension requires at least one Chat Completion endpoint, but a recommend at least two.
 - **Pass 1: Character Validation** - Use a fast, non-reasoning, emotionally-aware model to ensure the character isn't acting out of themselves.
 - **Pass 2: Prose Refinement** - Use a strong reasoning model to enhance the vocabulary, fix grammar, and elevate the writing style.
 - **Editing Main Prompt** - Remove or edit any bloat that may restrain the model's creativity, including banning words, strict high-quality writing styles, etc. Please save your original prompts beforehand.
@@ -80,7 +80,7 @@ You can help by submitting bug reports or opening pull requests!
 AGPL-3.0 LICENSE || Please read LICENSE for more information.
 
 ## TO-DO
-- Better event registration, response streaming and overall visualization, avoiding conflict with other generations
+- Avoid conflict with other generations
 - Advanced Prompt Control, prefills and role management Options
 - Text Completion Support
 - Conditional Pass Triggers based on ST-script
