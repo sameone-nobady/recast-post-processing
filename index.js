@@ -937,7 +937,8 @@ jQuery(async () => {
                             {},
                             false
                         );
-                    } else if (mesEl) {
+                    } else {
+                        // Fallback if element not found directly
                         updateMessageBlock(mesId, msg);
                     }
                     setButtonState(false);
@@ -956,7 +957,23 @@ jQuery(async () => {
                             const restoreMsg = getST().chat[mesId];
                             if (restoreMsg) {
                                 restoreMsg.mes = originalText;
-                                updateMessageBlock(mesId, restoreMsg);
+                                
+                                const mesEl = document.querySelector(`#chat .mes[mesid="${mesId}"]`);
+                                const mesTextEl = mesEl?.querySelector('.mes_text');
+                                if (mesTextEl) {
+                                    mesTextEl.innerHTML = messageFormatting(
+                                        originalText,
+                                        restoreMsg.name,
+                                        restoreMsg.is_system,
+                                        restoreMsg.is_user,
+                                        mesId,
+                                        {},
+                                        false
+                                    );
+                                } else {
+                                    updateMessageBlock(mesId, restoreMsg);
+                                }
+                                
                                 saveChat();
                             }
                             setButtonState(false);
@@ -973,7 +990,23 @@ jQuery(async () => {
                             const restoreMsg = getST().chat[mesId];
                             if (restoreMsg) {
                                 restoreMsg.mes = originalText;
-                                updateMessageBlock(mesId, restoreMsg);
+                                
+                                const mesEl = document.querySelector(`#chat .mes[mesid="${mesId}"]`);
+                                const mesTextEl = mesEl?.querySelector('.mes_text');
+                                if (mesTextEl) {
+                                    mesTextEl.innerHTML = messageFormatting(
+                                        originalText,
+                                        restoreMsg.name,
+                                        restoreMsg.is_system,
+                                        restoreMsg.is_user,
+                                        mesId,
+                                        {},
+                                        false
+                                    );
+                                } else {
+                                    updateMessageBlock(mesId, restoreMsg);
+                                }
+                                
                                 saveChat();
                             }
                             setButtonState(false);
