@@ -47,6 +47,24 @@ function setButtonState(state) {
     }
 }
 
+function safeUpdateMessageText(mesId, msg) {
+    const mesEl = document.querySelector(`#chat .mes[mesid="${mesId}"]`);
+    const mesTextEl = mesEl?.querySelector('.mes_text');
+    if (mesTextEl) {
+        mesTextEl.innerHTML = messageFormatting(
+            msg.mes,
+            msg.name,
+            msg.is_system,
+            msg.is_user,
+            mesId,
+            {},
+            false
+        );
+    }
+    
+    updateMessageBlock(mesId, msg);
+}
+
 // ACTIVITY AHHH
 
 let isProcessing = false;
@@ -321,11 +339,12 @@ async function runPass(pass, text, onChunk = null) {
         }
     }
 
+    // This needs to become a bit more fancy
     if (IncludeSceneContext && pass.contextLength > 0) {
         const CharName = char ? char.name : "Assistant";
         const History = st.chat.slice(-(pass.contextLength + 1), -1);
         if (History.length > 0) {
-            const SceneContext = History.map(m => `<message role="${m.is_user ? "user" : "character"}">${m.mes}</message>`).join("\n");
+            const SceneContext = History.map(m => `${m.name}: ${m.mes}`).join("\n");
             UserParts.push(`<scene_context>\n${SceneContext}\n</scene_context>`);
         }
     }
@@ -501,13 +520,11 @@ async function runPipeline(originalText, messageId, skipHide = false, prefixText
             logDebug("Pipeline cancelled during pass execution.");
             currentText = originalText;
             // Restore original text directly to the DOM if we were streaming inline
-            //if (shouldStreamInline && currentMessageId !== null) {
-                const msg = getST().chat[currentMessageId];
-                if (msg) {
-                    msg.mes = originalText;
-                    updateMessageBlock(currentMessageId, msg);
-                }
-            //}
+            const msg = getST().chat[currentMessageId];
+            if (msg) {
+                msg.mes = originalText;
+                safeUpdateMessageText(currentMessageId, msg);
+            }
             break;
         }
 
@@ -527,6 +544,7 @@ async function runPipeline(originalText, messageId, skipHide = false, prefixText
             const msg = getST().chat[currentMessageId];
             if (msg) {
                 msg.mes = prefixText + currentText;
+                
                 if (onChunk && power_user && power_user.stream_fade_in) {
                     // Update DOM directly one last time to avoid abruptly overwriting the fade-in animation via updateMessageBlock
                     const mesEl = document.querySelector(`#chat .mes[mesid="${currentMessageId}"]`);
@@ -534,11 +552,11 @@ async function runPipeline(originalText, messageId, skipHide = false, prefixText
                     if (mesTextEl) {
                         const formattedText = messageFormatting(msg.mes, msg.name, msg.is_system, msg.is_user, currentMessageId, {}, false);
                         applyStreamFadeIn(mesTextEl, formattedText);
-                    } else if (mesEl) {
+                    } else {
                         updateMessageBlock(currentMessageId, msg);
                     }
-                } else if (mesEl) {
-                    updateMessageBlock(currentMessageId, msg);
+                } else {
+                    safeUpdateMessageText(currentMessageId, msg);
                 }
             }
         }
@@ -563,7 +581,7 @@ async function runPipeline(originalText, messageId, skipHide = false, prefixText
             const msg = getST().chat[currentMessageId];
             if (msg) {
                 msg.mes = originalFullText;
-                updateMessageBlock(currentMessageId, msg);
+                safeUpdateMessageText(currentMessageId, msg);
             }
         }
         setButtonState(false);
@@ -582,7 +600,7 @@ async function runPipeline(originalText, messageId, skipHide = false, prefixText
             const msg = getST().chat[currentMessageId];
             if (msg) {
                 msg.mes = finalFullText;
-                updateMessageBlock(currentMessageId, msg);
+                safeUpdateMessageText(currentMessageId, msg);
             }
         }
     }
@@ -633,7 +651,7 @@ function acceptChanges(newText) {
         const msg = getST().chat[currentMessageId];
         if (msg) {
             msg.mes = newText;
-            updateMessageBlock(currentMessageId, msg);
+            safeUpdateMessageText(currentMessageId, msg);
             saveChat();
         }
     }
@@ -925,21 +943,7 @@ jQuery(async () => {
             if (result && result.skipped) {
                 if (isIntercepted) {
                     // fix allat
-                    const mesEl = document.querySelector(`#chat .mes[mesid="${mesId}"]`);
-                    const mesTextEl = mesEl?.querySelector('.mes_text');
-                    if (mesTextEl) {
-                        mesTextEl.innerHTML = messageFormatting(
-                            msg.mes,
-                            msg.name,
-                            msg.is_system,
-                            msg.is_user,
-                            mesId,
-                            {},
-                            false
-                        );
-                    } else if (mesEl) {
-                        updateMessageBlock(mesId, msg);
-                    }
+                    safeUpdateMessageText(mesId, msg);
                     setButtonState(false);
                 }
                 // Do NOT set isProcessing to false if we didn't start the pipeline or didn't own the lock
@@ -956,7 +960,7 @@ jQuery(async () => {
                             const restoreMsg = getST().chat[mesId];
                             if (restoreMsg) {
                                 restoreMsg.mes = originalText;
-                                updateMessageBlock(mesId, restoreMsg);
+                                safeUpdateMessageText(mesId, restoreMsg);
                                 saveChat();
                             }
                             setButtonState(false);
@@ -973,7 +977,7 @@ jQuery(async () => {
                             const restoreMsg = getST().chat[mesId];
                             if (restoreMsg) {
                                 restoreMsg.mes = originalText;
-                                updateMessageBlock(mesId, restoreMsg);
+                                safeUpdateMessageText(mesId, restoreMsg);
                                 saveChat();
                             }
                             setButtonState(false);

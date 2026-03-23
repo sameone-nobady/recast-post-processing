@@ -6,9 +6,10 @@
 
 In the near future, LLMs will be accompanied by output post-processing, allowing models to be corrected, realigned or to fulfill specific purposes without being overly instrusive.
 The main problem with LLMs cannot go back once their final response was generated or predict what they will say next, reasoning can help but it's still prone to prompt poisoning, lack of creativity or coherence.
-Post-processing solves that by allowing completely separate system prompts, reasoning chains or smaller models to take over the original response to verify accuracy or improve the quality of the text without being *completely* contextually aware of what the original request was. Making use of what LLMs are the best at: Smaller, clear and direct tasks.
+Post-processing solves that by allowing completely separate system prompts, reasoning chains or smaller models to take over the original response to verify accuracy or improve the quality of the text without being *completely* contextually aware of what the original request was.
 
-**The Next Generation of Prompt Management:** If you create and edit prompts often, you probably noticed that there is a ceiling for prompt engineering you hit very fast, with LLMs lacking the abilities to keep up with so many things at once, while *also* sounding natural and creative. *But what if you could make them all work reliably?* The concept of Post-Processing comes in; By breaking down into tasks *after* the original message was generated, keeping creativity and adding restraints after, allowing models to freely create content that will be modified during post-processing steps with strict prompt control. *Make use of what LLMs are the best at: Smaller, clear and direct tasks.*
+**The Problem With Prompt Engineering:** If you create and edit prompts often, you probably noticed that there is a ceiling you hit very fast, with LLMs lacking the abilities to keep up with so many things at once, while *also* sounding natural and creative. *But what if you could make them all work reliably?* The concept of Post-Processing comes in; By breaking down into tasks *after* the original message was generated, you keep creativity and add restraints after, allowing models to freely create content that will be modified during post-processing steps with strict prompt control.
+*Make use of what LLMs are the best at: Smaller, clear and direct tasks.*
 
 ⚠️ *This system makes use of multiple API calls, proceed at your own responsability and beware of usage costs.* ⚠️
 
@@ -85,6 +86,7 @@ Contact me through the Discord extension post or Reddit comments on the original
 You can help by submitting bug reports or opening pull requests!
 
 *Special thanks to Qvink for the Connection Profile generation! (github.com/qvink/qvink_memory)*
+
 *Beautiful custom theme - Moonlit Echoes by Rivelle! (https://github.com/RivelleDays/SillyTavern-MoonlitEchoesTheme)*
 
 ## Examples
@@ -104,6 +106,7 @@ You can help by submitting bug reports or opening pull requests!
 AGPL-3.0 LICENSE || Please read LICENSE for more information.
 
 ## TO-DO
+- Somehow make it stop disappearing with visual swipes (But you can still swipe with keybinds)
 - Advanced Prompt Control, prefills and role management Options
 - Text Completion Support
 - Conditional Pass Triggers based on ST-script
