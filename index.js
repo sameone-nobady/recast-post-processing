@@ -1,6 +1,6 @@
 import { extension_settings, getContext } from "../../../extensions.js";
 import { showDiffModal, initDiffViewer } from "./diffViewer.js";
-import { saveSettingsDebounced, generateRaw, updateMessageBlock, saveChat, messageFormatting, scrollChatToBottom, setSendButtonState } from "../../../../script.js";
+import { saveSettingsDebounced, generateRaw, updateMessageBlock, messageFormatting, scrollChatToBottom, setSendButtonState } from "../../../../script.js";
 import { power_user } from "../../../power-user.js"
 import { applyStreamFadeIn } from "../../../util/stream-fadein.js";
 import { getWorldInfoPrompt } from "../../../world-info.js";
@@ -620,7 +620,7 @@ async function runPipeline(originalText, messageId, skipHide = false, prefixText
                 if (restoreMsg) {
                     restoreMsg.mes = originalFullText;
                     updateMessageBlock(currentMessageId, restoreMsg);
-                    saveChat();
+                    getST().saveChat();
                 }
             }
             setButtonState(false);
@@ -655,7 +655,7 @@ function acceptChanges(newText) {
         if (msg) {
             msg.mes = newText;
             safeUpdateMessageText(currentMessageId, msg);
-            saveChat();
+            getST().saveChat();
         }
     }
     setButtonState(false);
@@ -964,7 +964,7 @@ jQuery(async () => {
                             if (restoreMsg) {
                                 restoreMsg.mes = originalText;
                                 safeUpdateMessageText(mesId, restoreMsg);
-                                saveChat();
+                                getST().saveChat();
                             }
                             setButtonState(false);
                             isProcessing = false;
@@ -981,7 +981,7 @@ jQuery(async () => {
                             if (restoreMsg) {
                                 restoreMsg.mes = originalText;
                                 safeUpdateMessageText(mesId, restoreMsg);
-                                saveChat();
+                                getST().saveChat();
                             }
                             setButtonState(false);
                             isProcessing = false;
