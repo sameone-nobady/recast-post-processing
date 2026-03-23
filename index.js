@@ -8,10 +8,7 @@ import { MacrosParser } from "../../../macros.js";
 import { getRegexedString, regex_placement } from "../../regex/engine.js";
 import { defaultPresets } from "./defaultPresets.js";
 
-// Utility to get ST variables
-function getST() {
-    return getContext();
-}
+// Setup
 
 const extensionName = "Recast";
 const extensionFolderPath = `scripts/extensions/third-party/recast-post-processing`;
@@ -31,11 +28,26 @@ const defaultSettings = {
     active_preset: "Default Preset"
 };
 
+// Base functions
+
+// Utility to get ST variables
+function getST() {
+    return getContext();
+}
+
 function logDebug(...args) {
     if (extension_settings[extensionName].debug_mode) {
         console.log("[Recast DEBUG]", ...args);
     }
 }
+
+function setButtonState(state) {
+    if (typeof setSendButtonState === 'function') {
+        setSendButtonState(state);
+    }
+}
+
+// ACTIVITY AHHH
 
 let isProcessing = false;
 let currentMessageId = null;
@@ -395,9 +407,7 @@ async function runPipeline(originalText, messageId, skipHide = false, prefixText
         return;
     }
     
-    if (typeof setSendButtonState === 'function') {
-        setSendButtonState(true);
-    }
+    setButtonState(true);
     
     const preset = extension_settings[extensionName].presets[idx];
     let currentText = originalText;
@@ -539,10 +549,6 @@ async function runPipeline(originalText, messageId, skipHide = false, prefixText
 
     LatestResult = finalFullText;
     isProcessing = false;
-    
-    if (typeof setSendButtonState === 'function') {
-        setSendButtonState(false);
-    }
 
     if (enabledPasses.length > 0) {
         $("#recast_progress_fill").css("width", `100%`);
@@ -561,6 +567,7 @@ async function runPipeline(originalText, messageId, skipHide = false, prefixText
                 updateMessageBlock(currentMessageId, msg);
             }
         }
+        setButtonState(false);
         return undefined;
     }
     
@@ -591,6 +598,7 @@ async function runPipeline(originalText, messageId, skipHide = false, prefixText
                     saveChat();
                 }
             }
+            setButtonState(false);
         });
     }
     
@@ -624,6 +632,7 @@ function acceptChanges(newText) {
             saveChat();
         }
     }
+    setButtonState(false);
 }
 
 // Register Recast macros with ST's MacrosParser.
@@ -921,6 +930,7 @@ jQuery(async () => {
                                     updateMessageBlock(mesId, restoreMsg);
                                     saveChat();
                                 }
+                                setButtonState(false);
                             } else {
                                 acceptChanges(result);
                             }
@@ -933,12 +943,14 @@ jQuery(async () => {
                                     updateMessageBlock(mesId, restoreMsg);
                                     saveChat();
                                 }
+                                setButtonState(false);
                             });
                         }
                     }, 500); // 500ms delay protects the final visual update
                 } else {
                     // Pipeline was skipped — restore the raw streamed content
                     updateMessageBlock(mesId, msg);
+                    setButtonState(false);
                 }
             }
         });
