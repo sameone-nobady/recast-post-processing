@@ -375,7 +375,7 @@ async function runPass(pass, text, onChunk = null) {
     }
 }
 
-async function runPipeline(originalText, messageId, skipHide = false) {
+async function runPipeline(originalText, messageId, skipHide = false, prefixText = "") {
     if (isProcessing) return;
     if (!extension_settings[extensionName].enabled) return;
 
@@ -453,7 +453,7 @@ async function runPipeline(originalText, messageId, skipHide = false) {
 
             const msg = getST().chat[currentMessageId];
             if (msg) {
-                msg.mes = textToRender;
+                msg.mes = prefixText + textToRender;
 
                 const mesEl = document.querySelector(`#chat .mes[mesid="${currentMessageId}"]`);
                 const mesTextEl = mesEl?.querySelector('.mes_text');
@@ -512,13 +512,13 @@ async function runPipeline(originalText, messageId, skipHide = false) {
         if (shouldStreamInline) {
             const msg = getST().chat[currentMessageId];
             if (msg) {
-                msg.mes = currentText;
+                msg.mes = prefixText + currentText;
                 if (onChunk && power_user && power_user.stream_fade_in) {
                     // Update DOM directly one last time to avoid abruptly overwriting the fade-in animation via updateMessageBlock
                     const mesEl = document.querySelector(`#chat .mes[mesid="${currentMessageId}"]`);
                     const mesTextEl = mesEl?.querySelector('.mes_text');
                     if (mesTextEl) {
-                        const formattedText = messageFormatting(currentText, msg.name, msg.is_system, msg.is_user, currentMessageId, {}, false);
+                        const formattedText = messageFormatting(msg.mes, msg.name, msg.is_system, msg.is_user, currentMessageId, {}, false);
                         applyStreamFadeIn(mesTextEl, formattedText);
                     } else {
                         updateMessageBlock(currentMessageId, msg);
@@ -530,7 +530,10 @@ async function runPipeline(originalText, messageId, skipHide = false) {
         }
     }
 
-    LatestResult = currentText;
+    const finalFullText = prefixText + currentText;
+    const originalFullText = prefixText + originalText;
+
+    LatestResult = finalFullText;
     isProcessing = false;
     
     if (enabledPasses.length > 0) {
@@ -546,7 +549,7 @@ async function runPipeline(originalText, messageId, skipHide = false) {
         if (currentMessageId !== null) {
             const msg = getST().chat[currentMessageId];
             if (msg) {
-                msg.mes = originalText;
+                msg.mes = originalFullText;
                 updateMessageBlock(currentMessageId, msg);
             }
         }
@@ -555,26 +558,26 @@ async function runPipeline(originalText, messageId, skipHide = false) {
     
     // When skipHide is active, the caller (MESSAGE_RECEIVED) handles typewriter display and saving.
     if (skipHide) {
-        return currentText;
+        return finalFullText;
     }
 
     if (extension_settings[extensionName].hide_until_last && currentMessageId !== null) {
         if (extension_settings[extensionName].replace_inline) {
             const msg = getST().chat[currentMessageId];
             if (msg) {
-                msg.mes = currentText;
+                msg.mes = finalFullText;
                 updateMessageBlock(currentMessageId, msg);
             }
         }
     }
     
     if (extension_settings[extensionName].replace_inline) {
-        acceptChanges(currentText);
+        acceptChanges(finalFullText);
     } else {
-        showDiffModal(originalText, currentText, acceptChanges);
+        showDiffModal(originalFullText, finalFullText, acceptChanges);
     }
     
-    return currentText;
+    return finalFullText;
 }
 
 
@@ -723,15 +726,23 @@ jQuery(async () => {
     if (st.eventSource && st.event_types) {
         // Helper: attach a MutationObserver on a .mes_text element that blanks any content
         // update while the pipeline is pending, creating a "char is typing..." visual.
-        function attachStreamIntercept(mesTextEl) {
+        function attachStreamIntercept(mesTextEl, preserveText = false) {
             if (streamInterceptObserver) streamInterceptObserver.disconnect();
-            mesTextEl.innerHTML = '';
-            streamInterceptObserver = new MutationObserver(() => {
+            const originalHTML = preserveText ? mesTextEl.innerHTML : '';
+            if (!preserveText) {
+                mesTextEl.innerHTML = '';
+            }
+            
+            const observerCallback = () => {
                 if (isResettingStream) return;
                 isResettingStream = true;
-                mesTextEl.innerHTML = '';
+                streamInterceptObserver.disconnect();
+                mesTextEl.innerHTML = originalHTML;
+                streamInterceptObserver.observe(mesTextEl, { childList: true, subtree: true, characterData: true });
                 isResettingStream = false;
-            });
+            };
+
+            streamInterceptObserver = new MutationObserver(observerCallback);
             streamInterceptObserver.observe(mesTextEl, { childList: true, subtree: true, characterData: true });
         }
 
@@ -769,7 +780,7 @@ jQuery(async () => {
             if (!extension_settings[extensionName].enabled) return;
             if (!extension_settings[extensionName].autorun) return;
             if (!extension_settings[extensionName].hide_until_last) return;
-            if (!['normal', 'swipe', 'regenerate', 'impersonate'].includes(type)) return;
+            if (!['normal', 'swipe', 'regenerate', 'impersonate', 'continue'].includes(type)) return;
 
             // Only bother if there are passes that will actually run
             const idx = getActivePresetIndex();
@@ -777,7 +788,7 @@ jQuery(async () => {
             const EnabledPasses = extension_settings[extensionName].presets[idx].passes.filter(p => p.enabled);
             if (EnabledPasses.length === 0) return;
 
-            if (type === 'swipe' || type === 'regenerate') {
+            if (type === 'swipe' || type === 'regenerate' || type === 'continue') {
                 // Swipe/regenerate update an existing element — blank its text directly now
                 const st2 = getST();
                 const mesId = st2.chat.length - 1;
@@ -785,8 +796,8 @@ jQuery(async () => {
                     const mesEl = document.querySelector(`#chat .mes[mesid="${mesId}"]`);
                     const mesTextEl = mesEl?.querySelector('.mes_text');
                     if (mesTextEl) {
-                        attachStreamIntercept(mesTextEl);
-                        logDebug(`Recast: stream intercepted on swipe/regenerate mesid=${mesId}.`);
+                        attachStreamIntercept(mesTextEl, type === 'continue');
+                        logDebug(`Recast: stream intercepted on ${type} mesid=${mesId}.`);
                     }
                 }
             } else {
@@ -856,7 +867,7 @@ jQuery(async () => {
 
     st.eventSource.on(st.event_types.MESSAGE_RECEIVED, async (mesId) => {
             if (!extension_settings[extensionName].autorun) return;
-            if (!['normal', 'swipe', 'regenerate', 'impersonate'].includes(lastGenerationType)) return;
+            if (!['normal', 'swipe', 'regenerate', 'impersonate', 'continue'].includes(lastGenerationType)) return;
 
             const chat = getST().chat;
             const msg = chat[mesId];
