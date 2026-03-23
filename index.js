@@ -574,7 +574,16 @@ async function runPipeline(originalText, messageId, skipHide = false, prefixText
     if (extension_settings[extensionName].replace_inline) {
         acceptChanges(finalFullText);
     } else {
-        showDiffModal(originalFullText, finalFullText, acceptChanges);
+        showDiffModal(originalFullText, finalFullText, acceptChanges, () => {
+            if (currentMessageId !== null) {
+                const restoreMsg = getST().chat[currentMessageId];
+                if (restoreMsg) {
+                    restoreMsg.mes = originalFullText;
+                    updateMessageBlock(currentMessageId, restoreMsg);
+                    saveChat();
+                }
+            }
+        });
     }
     
     return finalFullText;
@@ -896,7 +905,16 @@ jQuery(async () => {
                         // True streaming is now done directly during the pipeline execution (runPass).
                         // Just honour the diff/replace-inline setting for the final save.
                         if (extension_settings[extensionName].replace_inline) {
-                            acceptChanges(result);
+                            if (result === originalText) {
+                                const restoreMsg = getST().chat[mesId];
+                                if (restoreMsg) {
+                                    restoreMsg.mes = originalText;
+                                    updateMessageBlock(mesId, restoreMsg);
+                                    saveChat();
+                                }
+                            } else {
+                                acceptChanges(result);
+                            }
                         } else {
                             // The UI already shows the streamed result, so we need a rejection callback to revert it
                             showDiffModal(originalText, result, acceptChanges, () => {
