@@ -86,6 +86,7 @@ Contact me through the Discord extension post or Reddit comments on the original
 You can help by submitting bug reports or opening pull requests!
 
 *Special thanks to Qvink for the Connection Profile generation! (github.com/qvink/qvink_memory)*
+
 *Beautiful custom theme - Moonlit Echoes by Rivelle! (https://github.com/RivelleDays/SillyTavern-MoonlitEchoesTheme)*
 
 ## Examples
@@ -105,7 +106,7 @@ You can help by submitting bug reports or opening pull requests!
 AGPL-3.0 LICENSE || Please read LICENSE for more information.
 
 ## TO-DO
-- Somehow make it stop breaking swipes
+- Somehow make it stop disappearing with visual swipes (But you can still swipe with keybinds)
 - Advanced Prompt Control, prefills and role management Options
 - Text Completion Support
 - Conditional Pass Triggers based on ST-script

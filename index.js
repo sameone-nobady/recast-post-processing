@@ -339,6 +339,7 @@ async function runPass(pass, text, onChunk = null) {
         }
     }
 
+    // This needs to become a bit more fancy
     if (IncludeSceneContext && pass.contextLength > 0) {
         const CharName = char ? char.name : "Assistant";
         const History = st.chat.slice(-(pass.contextLength + 1), -1);
