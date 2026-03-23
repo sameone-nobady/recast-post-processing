@@ -1,6 +1,6 @@
 import { extension_settings, getContext } from "../../../extensions.js";
 import { showDiffModal, initDiffViewer } from "./diffViewer.js";
-import { saveSettingsDebounced, generateRaw, updateMessageBlock, saveChat, messageFormatting, scrollChatToBottom, setSendButtonState } from "../../../../script.js";
+import { saveSettingsDebounced, generateRaw, updateMessageBlock, messageFormatting, scrollChatToBottom, setSendButtonState } from "../../../../script.js";
 import { power_user } from "../../../power-user.js"
 import { applyStreamFadeIn } from "../../../util/stream-fadein.js";
 import { getWorldInfoPrompt } from "../../../world-info.js";
@@ -48,21 +48,42 @@ function setButtonState(state) {
 }
 
 function safeUpdateMessageText(mesId, msg) {
-    const mesEl = document.querySelector(`#chat .mes[mesid="${mesId}"]`);
-    const mesTextEl = mesEl?.querySelector('.mes_text');
-    if (mesTextEl) {
-        mesTextEl.innerHTML = messageFormatting(
-            msg.mes,
-            msg.name,
-            msg.is_system,
-            msg.is_user,
-            mesId,
-            {},
-            false
-        );
+    const mesEl = $(`#chat .mes[mesid="${mesId}"]`);
+    if (mesEl.length > 0) {
+        const mesTextEl = mesEl.find('.mes_text');
+        if (mesTextEl.length > 0) {
+            mesTextEl.empty();
+            mesEl.find('.mes_edit_buttons').css('display', 'none');
+            mesEl.find('.mes_buttons').css('display', '');
+            mesTextEl.append(
+                messageFormatting(
+                    msg.mes,
+                    msg.name,
+                    msg.is_system,
+                    msg.is_user,
+                    mesId,
+                    {},
+                    false
+                )
+            );
+        }
+        
+        const mesBiasEl = mesEl.find('.mes_bias');
+        if (mesBiasEl.length > 0) {
+            mesBiasEl.empty();
+            if (msg.extra?.bias) {
+                mesBiasEl.append(messageFormatting(msg.extra.bias, '', false, false, -1, {}, false));
+            }
+        }
     }
     
     updateMessageBlock(mesId, msg);
+
+    // This may fire extensions twice? Hopefully no one complains
+    const st = getST();
+    if (st.eventSource && st.event_types?.MESSAGE_UPDATED) {
+        st.eventSource.emit(st.event_types.MESSAGE_UPDATED, mesId);
+    }
 }
 
 // ACTIVITY AHHH
@@ -402,6 +423,9 @@ async function runPass(pass, text, onChunk = null) {
         return result || text;
     } catch (e) {
         console.error("Recast: Error in pass " + pass.name, e);
+        if (typeof toastr !== 'undefined' && toastr.error) {
+            toastr.error(`Error in pass "${pass.name}": ${e.message || e}`, "Recast Error", { timeOut: 10000 });
+        }
         return text;
     }
 }
@@ -617,7 +641,7 @@ async function runPipeline(originalText, messageId, skipHide = false, prefixText
                 if (restoreMsg) {
                     restoreMsg.mes = originalFullText;
                     updateMessageBlock(currentMessageId, restoreMsg);
-                    saveChat();
+                    getST().saveChat();
                 }
             }
             setButtonState(false);
@@ -652,7 +676,7 @@ function acceptChanges(newText) {
         if (msg) {
             msg.mes = newText;
             safeUpdateMessageText(currentMessageId, msg);
-            saveChat();
+            getST().saveChat();
         }
     }
     setButtonState(false);
@@ -695,6 +719,10 @@ jQuery(async () => {
     // Stop pipeline button
     progressBar.find("#recast_stop_pipeline").on("click", () => {
         isPipelineCancelled = true;
+        isProcessing = false;
+        setButtonState(false);
+        $("#recast_progress_bar").fadeOut(300);
+        $("#form_sheld").removeClass("recast-input-active");
         logDebug("Pipeline cancelled by user via stop button.");
     });
 
@@ -961,7 +989,7 @@ jQuery(async () => {
                             if (restoreMsg) {
                                 restoreMsg.mes = originalText;
                                 safeUpdateMessageText(mesId, restoreMsg);
-                                saveChat();
+                                getST().saveChat();
                             }
                             setButtonState(false);
                             isProcessing = false;
@@ -978,7 +1006,7 @@ jQuery(async () => {
                             if (restoreMsg) {
                                 restoreMsg.mes = originalText;
                                 safeUpdateMessageText(mesId, restoreMsg);
-                                saveChat();
+                                getST().saveChat();
                             }
                             setButtonState(false);
                             isProcessing = false;
