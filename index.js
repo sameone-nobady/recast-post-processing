@@ -402,6 +402,9 @@ async function runPass(pass, text, onChunk = null) {
         return result || text;
     } catch (e) {
         console.error("Recast: Error in pass " + pass.name, e);
+        if (typeof toastr !== 'undefined' && toastr.error) {
+            toastr.error(`Error in pass "${pass.name}": ${e.message || e}`, "Recast Error", { timeOut: 10000 });
+        }
         return text;
     }
 }
