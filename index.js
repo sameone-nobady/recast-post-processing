@@ -343,7 +343,7 @@ async function runPass(pass, text, onChunk = null) {
         const CharName = char ? char.name : "Assistant";
         const History = st.chat.slice(-(pass.contextLength + 1), -1);
         if (History.length > 0) {
-            const SceneContext = History.map(m => `<message role="${m.is_user ? "user" : "character"}">${m.mes}</message>`).join("\n");
+            const SceneContext = History.map(m => `${m.name}: ${m.mes}`).join("\n");
             UserParts.push(`<scene_context>\n${SceneContext}\n</scene_context>`);
         }
     }
