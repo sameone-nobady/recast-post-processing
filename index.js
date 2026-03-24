@@ -132,6 +132,7 @@ function safeUpdateMessageText(mesId, msg) {
 
 // ACTIVITY AHHH
 
+const recentProcessedMessages = new Set();
 let isProcessing = false;
 let currentMessageId = null;
 // Set by GENERATION_STARTED so the MutationObserver can hide the incoming AI message block before streaming
@@ -1016,8 +1017,13 @@ jQuery(async () => {
                 streamInterceptObserver = null;
                 logDebug('Recast: stream intercept released at MESSAGE_RECEIVED.');
             }
+            
+            if (recentProcessedMessages.has(mesId)) return;
+            recentProcessedMessages.add(mesId);
 
             const result = await runPipeline(msg.mes, mesId, isIntercepted);
+            
+            setTimeout(() => recentProcessedMessages.delete(mesId), 5000);
 
             if (result && result.skipped) {
                 if (isIntercepted) {
