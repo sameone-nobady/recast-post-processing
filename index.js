@@ -85,6 +85,7 @@ function setButtonState(state) {
 
 function safeUpdateMessageText(mesId, msg) {
     const mesEl = $(`#chat .mes[mesid="${mesId}"]`);
+    const hasMessageElement = mesEl.length > 0;
     if (mesEl.length > 0) {
         const mesTextEl = mesEl.find('.mes_text');
         if (mesTextEl.length > 0) {
@@ -114,7 +115,9 @@ function safeUpdateMessageText(mesId, msg) {
     }
 
     try {
-        updateMessageBlock(mesId, msg);
+        if (hasMessageElement) {
+            updateMessageBlock(mesId, msg);
+        }
     } catch (e) {
         console.warn("Recast: Non-fatal error in updateMessageBlock", e);
     }
@@ -137,6 +140,7 @@ let streamInterceptObserver = null;
 let isResettingStream = false;
 let streamInterceptToken = 0;
 let isGenerationStreaming = false;
+let pendingReceivedMesId = null;
 let isPipelineCancelled = false;
 let lastGenerationType = null;
 
@@ -891,6 +895,95 @@ jQuery(async () => {
             }
         }
 
+        //
+        async function processReceivedMessage(mesId) {
+            if (!extension_settings[extensionName].autorun) return;
+            if (!['normal', 'swipe', 'regenerate', 'impersonate', 'continue'].includes(lastGenerationType)) return;
+            if (mesId === 0) return; // uhh funny silly tavern
+
+            const chat = getST().chat;
+            const msg = chat[mesId];
+            if (!msg || msg.is_user) return;
+
+            // Capture whether streaming was being intercepted (determines the display path)
+            const isIntercepted = streamInterceptObserver !== null;
+            // Save the original (unprocessed) text before the pipeline modifies it
+            const originalText = msg.mes;
+
+            if (streamInterceptObserver) {
+                await waitMs(80);
+                releaseStreamIntercept();
+                logDebug('Recast: stream intercept released after generation stop + grace delay.');
+            }
+
+            //
+            // Visual handoff: once ST has the full raw model output, show it immediately
+            // while post-processing runs, instead of keeping the message blank.
+            if (isIntercepted) {
+                safeUpdateMessageText(mesId, msg);
+                logDebug('Recast: restored raw message content before pipeline run.');
+            }
+
+            const result = await runPipeline(msg.mes, mesId, isIntercepted);
+
+            if (result && result.skipped) {
+                if (isIntercepted) {
+                    // fix allat
+                    safeUpdateMessageText(mesId, msg);
+                    setButtonState(false);
+                }
+                // Do NOT set isProcessing to false if we didn't start the pipeline or didn't own the lock
+                return;
+            }
+
+            if (isIntercepted) {
+                // Allow the final stream fade-in animation some time to complete
+                setTimeout(() => {
+                    // True streaming is now done directly during the pipeline execution (runPass).
+                    // Just honour the diff/replace-inline setting for the final save.
+                    if (extension_settings[extensionName].replace_inline) {
+                        if (result === originalText) {
+                            const restoreMsg = getST().chat[mesId];
+                            if (restoreMsg) {
+                                restoreMsg.mes = originalText;
+                                safeUpdateMessageText(mesId, restoreMsg);
+                                getST().saveChat();
+                            }
+                            setButtonState(false);
+                            isProcessing = false;
+                        } else {
+                            acceptChanges(result);
+                        }
+                    } else {
+                        // Restore original text behind the modal so it's not showing the streamed result or blank
+                        const restoreMsg = getST().chat[mesId];
+                        if (restoreMsg) {
+                            restoreMsg.mes = originalText;
+                            safeUpdateMessageText(mesId, restoreMsg);
+                        }
+
+                        // The UI already shows the streamed result, so we need a rejection callback to revert it
+                        showDiffModal(originalText, result, (newText) => {
+                            acceptChanges(newText);
+                            isProcessing = false;
+                        }, () => {
+                            const restoreMsgRevert = getST().chat[mesId];
+                            if (restoreMsgRevert) {
+                                restoreMsgRevert.mes = originalText;
+                                safeUpdateMessageText(mesId, restoreMsgRevert);
+                                getST().saveChat();
+                            }
+                            setButtonState(false);
+                            isProcessing = false;
+                        });
+                    }
+                }, 500); // 500ms delay protects the final visual update
+            } else {
+                // If it wasn't intercepted but we are running in MESSAGE_RECEIVED skipHide logic
+                isProcessing = false;
+            }
+        }
+
         // Helper: attach a MutationObserver on a .mes_text element that blanks any content
         // update while the pipeline is pending, creating a "char is typing..." visual.
         function attachStreamIntercept(mesTextEl, preserveText = false) {
@@ -995,6 +1088,12 @@ jQuery(async () => {
                     logDebug(`Recast: generation stopped — restored content of mesid=${mesId}.`);
                 }
             }
+
+            if (pendingReceivedMesId !== null) {
+                const queuedMesId = pendingReceivedMesId;
+                pendingReceivedMesId = null;
+                processReceivedMessage(queuedMesId);
+            }
         });
 
         // Run pipeline once the message is fully received.
@@ -1038,95 +1137,15 @@ jQuery(async () => {
     });
 
     st.eventSource.on(st.event_types.MESSAGE_RECEIVED, async (mesId) => {
-            if (!extension_settings[extensionName].autorun) return;
-            if (!['normal', 'swipe', 'regenerate', 'impersonate', 'continue'].includes(lastGenerationType)) return;
-            if (mesId === 0) return; // uhh funny silly tavern
-
-            const chat = getST().chat;
-            const msg = chat[mesId];
-            if (!msg || msg.is_user) return;
-
-            // Capture whether streaming was being intercepted (determines the display path)
-            const isIntercepted = streamInterceptObserver !== null;
-            // Save the original (unprocessed) text before the pipeline modifies it
-            const originalText = msg.mes;
-
-            // ST is done streaming — release the intercept lock NOW, before the pipeline runs.
-            // Wait until GENERATION_STOPPED confirms stream end. Some providers can emit
-            // MESSAGE_RECEIVED slightly early while final token/UI mutations still flush.
-            if (streamInterceptObserver) {
-                await waitForGenerationStop(2500);
-                await waitMs(80);
-                releaseStreamIntercept();
-                logDebug('Recast: stream intercept released after generation stop + grace delay.');
-            }
-
-            //
-            // Visual handoff: once ST has the full raw model output, show it immediately
-            // while post-processing runs, instead of keeping the message blank.
-            if (isIntercepted) {
-                safeUpdateMessageText(mesId, msg);
-                logDebug('Recast: restored raw message content before pipeline run.');
-            }
-
-            const result = await runPipeline(msg.mes, mesId, isIntercepted);
-
-            if (result && result.skipped) {
-                if (isIntercepted) {
-                    // fix allat
-                    safeUpdateMessageText(mesId, msg);
-                    setButtonState(false);
-                }
-                // Do NOT set isProcessing to false if we didn't start the pipeline or didn't own the lock
+            // If streaming still active, defer processing to GENERATION_STOPPED.
+            // This avoids releasing intercept while the provider still flushes output.
+            if (isGenerationStreaming) {
+                pendingReceivedMesId = mesId;
+                logDebug(`Recast: queued MESSAGE_RECEIVED mesid=${mesId} until generation fully stops.`);
                 return;
             }
 
-            if (isIntercepted) {
-                // Allow the final stream fade-in animation some time to complete
-                setTimeout(() => {
-                    // True streaming is now done directly during the pipeline execution (runPass).
-                    // Just honour the diff/replace-inline setting for the final save.
-                    if (extension_settings[extensionName].replace_inline) {
-                        if (result === originalText) {
-                            const restoreMsg = getST().chat[mesId];
-                            if (restoreMsg) {
-                                restoreMsg.mes = originalText;
-                                safeUpdateMessageText(mesId, restoreMsg);
-                                getST().saveChat();
-                            }
-                            setButtonState(false);
-                            isProcessing = false;
-                        } else {
-                            acceptChanges(result);
-                        }
-                    } else {
-                        // Restore original text behind the modal so it's not showing the streamed result or blank
-                        const restoreMsg = getST().chat[mesId];
-                        if (restoreMsg) {
-                            restoreMsg.mes = originalText;
-                            safeUpdateMessageText(mesId, restoreMsg);
-                        }
-
-                        // The UI already shows the streamed result, so we need a rejection callback to revert it
-                        showDiffModal(originalText, result, (newText) => {
-                            acceptChanges(newText);
-                            isProcessing = false;
-                        }, () => {
-                            const restoreMsgRevert = getST().chat[mesId];
-                            if (restoreMsgRevert) {
-                                restoreMsgRevert.mes = originalText;
-                                safeUpdateMessageText(mesId, restoreMsgRevert);
-                                getST().saveChat();
-                            }
-                            setButtonState(false);
-                            isProcessing = false;
-                        });
-                    }
-                }, 500); // 500ms delay protects the final visual update
-            } else {
-                // If it wasn't intercepted but we are running in MESSAGE_RECEIVED skipHide logic
-                isProcessing = false;
-            }
+            processReceivedMessage(mesId);
         });
     }
 });
