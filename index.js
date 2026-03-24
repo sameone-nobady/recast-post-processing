@@ -199,9 +199,6 @@ function setButtonState(state) { // False unlocks, true locks it
     if (typeof setSendButtonState === 'function') {
         setSendButtonState(state);
     }
-    if (!state) {
-        $('.swipe_left.fa-solid.fa-chevron-left.interactable').css('opacity', '0.6');
-    }
 }
 
 // Makes sure to update the message in chat. Had a lot of trouble in the past with this so there may be a bit too much stuff
