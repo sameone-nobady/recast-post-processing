@@ -1,7 +1,8 @@
 // diffViewer.js — Recast Diff Viewer
 // Word-level diff rendering and review modal management.
+// sponsored by claude the goat
 
-// ── Helpers ───────────────────────────────────────────────────
+/// Helpers
 
 function escapeHtml(str) {
     return str

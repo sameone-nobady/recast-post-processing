@@ -1,3 +1,4 @@
+// For Legacy API support.
 import { SlashCommandParser } from "../../../../slash-commands/SlashCommandParser.js";
 import { event_types, online_status, eventSource } from "../../../../../script.js";
 
