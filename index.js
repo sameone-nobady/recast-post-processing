@@ -1,6 +1,6 @@
 // IMPORTS
 import { extension_settings, getContext } from "../../../extensions.js";
-import { saveSettingsDebounced, generateRaw, updateMessageBlock, messageFormatting, scrollChatToBottom, setSendButtonState, isStreamingEnabled as isSTStreamingEnabled } from "../../../../script.js";
+import { saveSettingsDebounced, generateRaw, updateMessageBlock, messageFormatting, scrollChatToBottom, setSendButtonState, isStreamingEnabled as isSTStreamingEnabled, showSwipeButtons} from "../../../../script.js";
 import { power_user } from "../../../power-user.js"
 import { applyStreamFadeIn } from "../../../util/stream-fadein.js";
 import { getWorldInfoPrompt } from "../../../world-info.js";
@@ -198,6 +198,10 @@ function showErrorToast(passName, error) {
 function setButtonState(state) { // False unlocks, true locks it
     if (typeof setSendButtonState === 'function') {
         setSendButtonState(state);
+    }
+
+    if (!state) {
+        showSwipeButtons() // Oh my god wolf is godsend
     }
 }
 
