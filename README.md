@@ -11,7 +11,7 @@
 https://github.com/closuretxt/recast-post-processing
 ```
 
-## About Post Processing
+## About ST Post-Processing
 
 **Recast** or **ST Post-Processing** is a SillyTavern extension that adds a highly configurable, multi-pass post-processing pipeline to any AI message output. Aiming towards improving the quality and coherence of the final message.
 
@@ -83,16 +83,6 @@ Essentially, this picks up a response, processes it through each pass in your pi
 - Tested and built on the **Latest Staging** build of SillyTavern.
 - For model switching per pass, the **Connection Profiles** extension must be enabled.
 
-## 🤝 Support and Contributions
-
-Contact me through the Discord extension post or Reddit comments on the original post regarding this extension.
-
-You can help by submitting bug reports or opening pull requests!
-
-*Special thanks to Qvink for the Connection Profile generation! (github.com/qvink/qvink_memory)*
-
-*Beautiful custom theme - Moonlit Echoes by Rivelle! (https://github.com/RivelleDays/SillyTavern-MoonlitEchoesTheme)*
-
 ## Examples
 
  - Claude 4.6 Opus as the Main Model, GLM 5 No reasoning (Validator) and DS 3.2 Reasoning (Prose)
@@ -104,6 +94,17 @@ You can help by submitting bug reports or opening pull requests!
 
  - Deepseek 3.2 Reasoning, GLM 5 No reasoning (Validator) and DS 3.2 Reasoning (Prose)
 ![Example](https://raw.githubusercontent.com/closuretxt/closure-imgdump/refs/heads/main/deepseek%20reasoning.png)
+
+## 🤝 Support and Contributions
+
+Contact me through the Discord extension post or Reddit comments on the original post regarding this extension.
+You can help by submitting bug reports or opening pull requests!
+
+### Special Thanks
+- *Qvink for the Connection Profile generation! [Available here](github.com/qvink/qvink_memory)*
+- *Rivelle for the Beautiful custom theme - Moonlit Echoes! [Available here](https://github.com/RivelleDays/SillyTavern-MoonlitEchoesTheme)*
+- *RossAscends for the robust Profile Switching! [Available here](https://github.com/RossAscends/ST-TCReasoningProfile)*
+- *SillyTavern devs, [weather](https://github.com/bmen25124), [Qvink](github.com/qvink) and community for the ConnectionProfileService*
 
 ## 📄 License
 
