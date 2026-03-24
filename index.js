@@ -41,9 +41,65 @@ function logDebug(...args) {
     }
 }
 
+// CONNECTION PROFILE MANAGER STUFF
+function getErrorStatusCode(error) {
+    return error?.response?.status
+        ?? error?.status
+        ?? error?.error?.status
+        ?? error?.cause?.status
+        ?? error?.cause?.response?.status
+        ?? null;
+}
+
+function shouldRetryRequest(error) {
+    const StatusCode = getErrorStatusCode(error);
+    return StatusCode === 400 || StatusCode === 401 || StatusCode === 403;
+}
+
+function isConnectionManagerActive(st) {
+    return !st?.extensionSettings?.disabledExtensions?.includes('connection-manager')
+        && !!st?.extensionSettings?.connectionManager;
+}
+
+function getConnectionProfiles(st) {
+    if (!isConnectionManagerActive(st)) {
+        return [];
+    }
+    return st.extensionSettings.connectionManager.profiles || [];
+}
+
+function hasConnectionProfile(st, profileId) {
+    if (!profileId) return true;
+    const Profiles = getConnectionProfiles(st);
+    return Profiles.some(p => p.id === profileId);
+}
+
+function resolveConnectionProfile(st, preferredProfileId = "") {
+    const SelectedProfile = st?.extensionSettings?.connectionManager?.selectedProfile || "";
+
+    if (!isConnectionManagerActive(st)) {
+        return "";
+    }
+
+    if (preferredProfileId && hasConnectionProfile(st, preferredProfileId)) {
+        return preferredProfileId;
+    }
+
+    if (preferredProfileId && !hasConnectionProfile(st, preferredProfileId)) {
+        logDebug(`Requested profile '${preferredProfileId}' not found. Falling back to current profile.`);
+    }
+
+    if (SelectedProfile && hasConnectionProfile(st, SelectedProfile)) {
+        return SelectedProfile;
+    }
+
+    return "";
+}
+
 function showErrorToast(passName, error) {
     if (typeof toastr !== 'undefined' && toastr.error) {
         let errorMsg = error.message || String(error);
+        const statusCode = getErrorStatusCode(error);
 
         // If it's an object with nothing useful, try to stringify
         if (errorMsg === "[object Object]") {
@@ -73,10 +129,16 @@ function showErrorToast(passName, error) {
                 }
             } catch(e) {}
         }
+
+        if (statusCode !== null && statusCode !== undefined) {
+            errorMsg = `HTTP ${statusCode}: ${errorMsg}`;
+        }
+
         toastr.error(`Check your Connection Profile. Error in pass "${passName}": ${errorMsg}`, "Recast Error", { timeOut: 10000 });
     }
 }
 
+// Core Silly
 function setButtonState(state) {
     if (typeof setSendButtonState === 'function') {
         setSendButtonState(state);
@@ -423,7 +485,7 @@ async function runPass(pass, text, onChunk = null) {
         logDebug("System prompt:", systemPrompt);
         logDebug("User prompt:", userPrompt);
 
-        const ConnectionProfile = pass.connection ? pass.connection : st.extensionSettings.connectionManager?.selectedProfile;
+        const ConnectionProfile = resolveConnectionProfile(st, pass.connection || "");
 
         const messages = [
             { role: "system", content: systemPrompt },
@@ -431,36 +493,67 @@ async function runPass(pass, text, onChunk = null) {
         ];
 
         let result = "";
-        
-        if (st.ConnectionManagerRequestService && st.ConnectionManagerRequestService.sendRequest) {
-            // Get the stream generator by passing stream: true
-            // Passing undefined for maxTokens to allow the model default
-            const isStreamingEnabled = extension_settings[extensionName].stream_pipeline;
+
+        async function requestPass(connectionProfileId, streamMode) {
+            if (!st.ConnectionManagerRequestService || !st.ConnectionManagerRequestService.sendRequest) {
+                throw new Error("ConnectionManagerRequestService.sendRequest is unavailable.");
+            }
+
+            logDebug(`Pass ${pass.name}: sendRequest profile='${connectionProfileId || "<same-as-current>"}', stream=${streamMode}`);
+
             const createGenerator = await st.ConnectionManagerRequestService.sendRequest(
-                ConnectionProfile, 
-                messages, 
-                undefined, 
-                { stream: isStreamingEnabled }
+                connectionProfileId,
+                messages,
+                undefined,
+                { stream: streamMode }
             );
-            
+
             if (typeof createGenerator === 'function') {
                 const generator = createGenerator();
+                let streamResult = "";
                 for await (const chunk of generator) {
                     if (isPipelineCancelled) {
                         logDebug(`Pass ${pass.name}: stream aborted by isPipelineCancelled.`);
                         break;
                     }
                     if (chunk && chunk.text !== undefined) {
-                        result = chunk.text; // The generator typically yields the accumulated string so far
+                        streamResult = chunk.text;
                         if (onChunk) {
-                            onChunk(result);
+                            onChunk(streamResult);
                         }
                     }
                 }
-            } else if (createGenerator && typeof createGenerator === 'object') {
-                // If it wasn't a stream or generator failed to stream
-                result = createGenerator.content || createGenerator.text || String(createGenerator);
-                if (onChunk) onChunk(result);
+                return streamResult;
+            }
+
+            if (createGenerator && typeof createGenerator === 'object') {
+                const fallbackResult = createGenerator.content || createGenerator.text || String(createGenerator);
+                if (onChunk) onChunk(fallbackResult);
+                return fallbackResult;
+            }
+
+            return "";
+        }
+        
+        const isStreamingEnabled = extension_settings[extensionName].stream_pipeline;
+
+        try {
+            result = await requestPass(ConnectionProfile, isStreamingEnabled);
+        } catch (firstError) {
+            const fallbackProfile = resolveConnectionProfile(st, "");
+            const retryWithFallbackProfile = shouldRetryRequest(firstError) && fallbackProfile !== ConnectionProfile;
+            const retryWithoutStreaming = isStreamingEnabled;
+
+            if (retryWithFallbackProfile || retryWithoutStreaming) {
+                const RetryProfile = retryWithFallbackProfile ? fallbackProfile : ConnectionProfile;
+                const RetryStream = retryWithoutStreaming ? false : isStreamingEnabled;
+                logDebug(
+                    `Pass ${pass.name}: first request failed (status=${getErrorStatusCode(firstError) ?? "unknown"}). ` +
+                    `Retrying with profile='${RetryProfile || "<same-as-current>"}', stream=${RetryStream}`
+                );
+                result = await requestPass(RetryProfile, RetryStream);
+            } else {
+                throw firstError;
             }
         }
 
