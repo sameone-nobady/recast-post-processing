@@ -113,12 +113,20 @@ function safeUpdateMessageText(mesId, msg) {
         }
     }
     
-    updateMessageBlock(mesId, msg);
+    try {
+        updateMessageBlock(mesId, msg);
+    } catch (e) {
+        console.warn("Recast: Non-fatal error in updateMessageBlock", e);
+    }
 
     // This may fire extensions twice? Hopefully no one complains
     const st = getST();
     if (st.eventSource && st.event_types?.MESSAGE_UPDATED) {
-        st.eventSource.emit(st.event_types.MESSAGE_UPDATED, mesId);
+        try {
+            st.eventSource.emit(st.event_types.MESSAGE_UPDATED, mesId);
+        } catch (e) {
+            console.warn("Recast: Non-fatal error emitting MESSAGE_UPDATED", e);
+        }
     }
 }
 
