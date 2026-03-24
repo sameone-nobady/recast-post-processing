@@ -112,13 +112,8 @@ function safeUpdateMessageText(mesId, msg) {
             }
         }
     }
-    
-    try {
-        updateMessageBlock(mesId, msg);
-    } catch (e) {
-        console.warn("Recast: Non-fatal error in updateMessageBlock", e);
-    }
 
+    
     // This may fire extensions twice? Hopefully no one complains
     const st = getST();
     if (st.eventSource && st.event_types?.MESSAGE_UPDATED) {
@@ -1015,6 +1010,14 @@ jQuery(async () => {
                 streamInterceptObserver.disconnect();
                 streamInterceptObserver = null;
                 logDebug('Recast: stream intercept released at MESSAGE_RECEIVED.');
+            }
+
+            //
+            // Visual handoff: once ST has the full raw model output, show it immediately
+            // while post-processing runs, instead of keeping the message blank.
+            if (isIntercepted) {
+                safeUpdateMessageText(mesId, msg);
+                logDebug('Recast: restored raw message content before pipeline run.');
             }
 
             const result = await runPipeline(msg.mes, mesId, isIntercepted);
