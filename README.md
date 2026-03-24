@@ -49,12 +49,10 @@ Essentially, this picks up a response, processes it through each pass in your pi
 - **Diff Viewer:** Review, edit, accept, or reject the changes made by the pipeline with a clean side-by-side diff UI.
 - **Highly Customizable:**
   - Auto-run on generation or trigger manually.
-  - Skip diff view for seamless inline replacement.
-  - Hide the original message until the entire pipeline is complete.
+  - Skip diff view and hide original message for seamless use.
 - **Preset System:** Save, load, and manage different pipeline configurations. Drag and drop passes to reorder them.
 - **Macro Support:** Allows the injection of macros inside the post-processing prompts, allowing other extensions & information to be used in specific passes. Recast also exposes `{{recast_latest}}` and `{{recast_<pass_id>}}` macros for advanced workflows.
 - **Simple Direct Design:** We kept everything compact and direct, with advanced options being optional.
-![Extension UI](https://raw.githubusercontent.com/closuretxt/closure-imgdump/refs/heads/main/extension%20ui%202.png)
 
 ## 💡 Usage Guide
 
@@ -82,6 +80,9 @@ Essentially, this picks up a response, processes it through each pass in your pi
 
 - Tested and built on the **Latest Staging** build of SillyTavern.
 - For model switching per pass, the **Connection Profiles** extension must be enabled.
+
+### Troubleshooting
+- If you have any API issues, turn on 'Legacy Connection Profile' in Advanced Settings and make sure the API is valid.
 
 ## Examples
 
