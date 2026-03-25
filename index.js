@@ -1236,24 +1236,6 @@ jQuery(async () => {
             }
         }
 
-        // Init compatibility listeners if mode is on, providing a callback to re-arm the hide flag
-        if (extension_settings[extensionName].compatibility_mode) { // Makes sure Compatibility won't be touched unless the user enables it
-            initCompatibilityListeners(() => {
-                if (extension_settings[extensionName].enabled && extension_settings[extensionName].autorun && extension_settings[extensionName].compatibility_mode) {
-                    logDebug(`Recast: Stepped Thinking released mutex.`);
-                    skipGenTypecheck = true
-
-                    // Stepped Thinking might take a few milliseconds to put the actual message in
-                    //setTimeout(() => {
-                        //const st2 = getST();
-                        //const mesId = st2.chat.length;
-                        //logDebug(`Recast: Stepped Thinking released mutex. Triggering Pipeline on mesid=${mesId}.`);
-                        //triggerPipelineOnMessage(mesId, true);
-                    //}, 200);
-                }
-            });
-        }
-
         // When generation starts, set up interception before any token arrives.
         st.eventSource.on(st.event_types.GENERATION_STARTED, (type, _opts, dryRun) => {
             lastGenerationType = type;
@@ -1316,5 +1298,23 @@ jQuery(async () => {
                 }
             }
         });
+
+        // Init compatibility listeners if mode is on, providing a callback to re-arm the hide flag
+        if (extension_settings[extensionName].compatibility_mode) { // Makes sure Compatibility won't be touched unless the user enables it
+            initCompatibilityListeners(() => {
+                if (extension_settings[extensionName].enabled && extension_settings[extensionName].autorun && extension_settings[extensionName].compatibility_mode) {
+                    logDebug(`Recast: Stepped Thinking released mutex.`);
+                    skipGenTypecheck = true
+
+                    // Stepped Thinking might take a few milliseconds to put the actual message in
+                    //setTimeout(() => {
+                        //const st2 = getST();
+                        //const mesId = st2.chat.length;
+                        //logDebug(`Recast: Stepped Thinking released mutex. Triggering Pipeline on mesid=${mesId}.`);
+                        //triggerPipelineOnMessage(mesId, true);
+                    //}, 200);
+                }
+            });
+        }
     }
 });
