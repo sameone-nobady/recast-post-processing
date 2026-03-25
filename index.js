@@ -636,7 +636,7 @@ async function runPass(pass, text, onChunk = null) {
             }
         }
 
-        result = parse_reasoning(result, ConnectionProfile);
+        //result = parse_reasoning(result, ConnectionProfile);
         logDebug("Pass result:", result);
         return result || text;
     } catch (e) {
