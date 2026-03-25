@@ -254,11 +254,11 @@ function safeUpdateMessageText(mesId, msg) {
 
     // This may fire extensions twice? Hopefully no one complains
     const st = getST();
-    if (st.eventSource && st.event_types?.MESSAGE_UPDATED) {
+    if (st.eventSource && st.event_types?.MESSAGE_EDITED) {
         try {
-            st.eventSource.emit(st.event_types.MESSAGE_UPDATED, mesId);
+            st.eventSource.emit(st.event_types.MESSAGE_EDITED, mesId);
         } catch (e) {
-            console.warn("Recast: Non-fatal error emitting MESSAGE_UPDATED", e);
+            console.warn("Recast: Non-fatal error emitting MESSAGE_EDITED", e);
         }
     }
 }
