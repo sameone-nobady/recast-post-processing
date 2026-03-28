@@ -82,8 +82,11 @@ import { extension_settings } from "../../../../extensions.js";
 
 // Build comparison steps from pass snapshots.
 // snapshots: [originalText, afterPass1, afterPass2, ..., finalText]
-function buildSteps(snapshots) {
+// passNames: ["Pass1Name", "Pass2Name", ...] — names of enabled passes in order
+function buildSteps(snapshots, passNames) {
     if (!snapshots || snapshots.length < 2) return null;
+
+    const getName = (i) => (passNames && passNames[i - 1]) ? passNames[i - 1] : `Pass ${i}`;
 
     const steps = [];
 
@@ -100,8 +103,9 @@ function buildSteps(snapshots) {
         steps.push({
             oldText: snapshots[i],
             newText: snapshots[i + 1],
-            oldLabel: i === 0 ? "Original" : `Pass ${i}`,
-            newLabel: `Pass ${i + 1}`
+            oldLabel: i === 0 ? "Original" : getName(i),
+            newLabel: getName(i + 1),
+            caption: i === 0 ? `Original → ${getName(1)}` : `${getName(i)} → ${getName(i + 1)}`
         });
     }
 
@@ -110,8 +114,8 @@ function buildSteps(snapshots) {
 
 function getStepCaption(stepIndex) {
     if (stepIndex === 0) return "Full Diff";
-    if (stepIndex === 1) return "Original → Pass 1";
-    return `Pass ${stepIndex - 1} → Pass ${stepIndex}`;
+    if (!_steps || !_steps[stepIndex]) return `Step ${stepIndex}`;
+    return _steps[stepIndex].caption || `Step ${stepIndex}`;
 }
 
 //
@@ -178,13 +182,13 @@ function renderNavigation() {
     stepsBar.show();
 }
 
-export function showDiffModal(originalText, transformedText, onAccept, onReject = null, passSnapshots = null) {
+export function showDiffModal(originalText, transformedText, onAccept, onReject = null, passSnapshots = null, passNames = null) {
     _acceptCallback = onAccept;
     _rejectCallback = onReject;
     _currentStep = 0;
 
     // Build navigation steps when 2+ passes are present
-    _steps = (passSnapshots && passSnapshots.length >= 3) ? buildSteps(passSnapshots) : null;
+    _steps = (passSnapshots && passSnapshots.length >= 3) ? buildSteps(passSnapshots, passNames) : null;
 
     // Store original text and pre-fill textarea
     $("#recast_diff_modal").data("original", originalText);

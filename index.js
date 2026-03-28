@@ -56,6 +56,7 @@ let lastGenerationType = null;
 const PassResults = {};
 let LatestResult = "";
 let _passSnapshots = [];
+let _passNames = [];
 
 // Base functions
 // Utility to get ST variables
@@ -629,6 +630,7 @@ async function runPipeline(originalText, messageId, skipHide = false, prefixText
     _passSnapshots = [prefixText + originalText];
 
     const enabledPasses = preset.passes.filter(p => p.enabled);
+    _passNames = enabledPasses.map(p => p.name);
     
     if (enabledPasses.length > 0) {
         pipelineBar.start(enabledPasses.length, currentText);
@@ -833,7 +835,7 @@ async function runPipeline(originalText, messageId, skipHide = false, prefixText
             }
             setButtonState(false);
             isProcessing = false;
-        }, _passSnapshots);
+        }, _passSnapshots, _passNames);
     }
     
     return finalFullText;
@@ -1159,7 +1161,7 @@ jQuery(async () => {
                             }
                             setButtonState(false);
                             isProcessing = false;
-                        }, _passSnapshots);
+                        }, _passSnapshots, _passNames);
                     }
                 }, 500); // 500ms delay protects the final visual update
             } else {
