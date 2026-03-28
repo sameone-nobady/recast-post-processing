@@ -355,6 +355,13 @@ ins.rc-ins {
     font-weight: 500;
 }
 
+.rc-diff-step-name {
+    font-size: 0.85em;
+    opacity: 0.55;
+    font-weight: 400;
+    letter-spacing: 0;
+}
+
 .rc-diff-nav-arrow {
     background: none;
     border: none;

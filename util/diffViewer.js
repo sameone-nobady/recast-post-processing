@@ -155,8 +155,14 @@ function renderStep(stepIndex) {
     $(".rc-diff-dot").removeClass("rc-diff-dot-active");
     $(`.rc-diff-dot[data-step="${stepIndex}"]`).addClass("rc-diff-dot-active");
 
-    // Update step caption text
-    $("#recast_diff_step_label").text(getStepCaption(stepIndex));
+    // Update step caption text — append pass name annotation when available
+    const caption = getStepCaption(stepIndex);
+    const passName = stepIndex > 0 && step.passName ? step.passName : null;
+    if (passName) {
+        $("#recast_diff_step_label").html(`${caption} <span class="rc-diff-step-name">(${escapeHtml(passName)})</span>`);
+    } else {
+        $("#recast_diff_step_label").text(caption);
+    }
 
     // Update arrow disabled state
     $("#recast_diff_prev").prop("disabled", stepIndex === 0);
