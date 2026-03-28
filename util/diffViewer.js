@@ -86,7 +86,7 @@ import { extension_settings } from "../../../../extensions.js";
 function buildSteps(snapshots, passNames) {
     if (!snapshots || snapshots.length < 2) return null;
 
-    const getName = (i) => (passNames && passNames[i - 1]) ? passNames[i - 1] : `Pass ${i}`;
+    const getPassName = (i) => (passNames && passNames[i - 1]) ? passNames[i - 1] : null;
 
     const steps = [];
 
@@ -103,9 +103,10 @@ function buildSteps(snapshots, passNames) {
         steps.push({
             oldText: snapshots[i],
             newText: snapshots[i + 1],
-            oldLabel: i === 0 ? "Original" : getName(i),
-            newLabel: getName(i + 1),
-            caption: i === 0 ? `Original → ${getName(1)}` : `${getName(i)} → ${getName(i + 1)}`
+            oldLabel: i === 0 ? "Original" : `Pass ${i}`,
+            newLabel: `Pass ${i + 1}`,
+            caption: i === 0 ? "Original → Pass 1" : `Pass ${i} → Pass ${i + 1}`,
+            passName: getPassName(i + 1)
         });
     }
 
