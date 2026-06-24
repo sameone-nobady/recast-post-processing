@@ -797,7 +797,10 @@ export async function runPipeline(originalText, messageId, skipHide = false, pre
             }
             setButtonState(false);
             isProcessing = false;
-        }, _passSnapshots, _passNames);
+        }, _passSnapshots, _passNames, null, () => {
+            setButtonState(false);
+            isProcessing = false;
+        });
     } catch (e) {
         console.error("[Recast] Error showing diff modal:", e);
         setButtonState(false);
@@ -962,12 +965,12 @@ function showGreenStateOptions(mesId) {
             <div class="recast-dialog-wrapper">
                 <div class="rc-diff-header">
                     <span class="rc-diff-title">Changes Applied</span>
-                    <button id="recast_undo_close" class="rc-diff-close-btn" title="Cancel"><i class="fa-solid fa-xmark"></i></button>
+                    <button id="recast_undo_close" class="rc-diff-close-btn" title="Close"><i class="fa-solid fa-xmark"></i></button>
                 </div>
-                <div class="recast-dialog-body">Do you want to undo the changes?</div>
+                <div class="recast-dialog-body">Confirm or undo changes</div>
                 <div class="rc-diff-footer">
-                    <button id="recast_undo_cancel" class="menu_button red_button rc-diff-btn"><i class="fa-solid fa-xmark"></i> Cancel</button>
-                    <button id="recast_undo_confirm" class="menu_button rc-diff-btn rc-diff-accept-btn"><i class="fa-solid fa-check"></i> Undo</button>
+                    <button id="recast_undo_confirm" class="menu_button rc-diff-btn rc-diff-accept-btn"><i class="fa-solid fa-check"></i> Confirm</button>
+                    <button id="recast_undo_cancel" class="menu_button red_button rc-diff-btn"><i class="fa-solid fa-xmark"></i> Undo changes</button>
                 </div>
             </div>
         </div>
@@ -977,11 +980,20 @@ function showGreenStateOptions(mesId) {
     $("#recast_undo_dialog").fadeIn(200);
 
     $("#recast_undo_confirm").on("click", function() {
+        if (_messageStates[mesId]) {
+            _messageStates[mesId].state = "grey";
+        }
+        updateMessageButtonState(mesId, "grey");
+        saveMessageStates();
+        $("#recast_undo_dialog").fadeOut(200, function() { $(this).remove(); });
+    });
+
+    $("#recast_undo_cancel").on("click", function() {
         $("#recast_undo_dialog").fadeOut(200, function() { $(this).remove(); });
         undoChanges(mesId);
     });
 
-    $("#recast_undo_cancel, #recast_undo_close").on("click", function() {
+    $("#recast_undo_close").on("click", function() {
         $("#recast_undo_dialog").fadeOut(200, function() { $(this).remove(); });
     });
 }
@@ -1014,7 +1026,10 @@ function openDiffWindow(mesId) {
         isProcessing = false;
     }, () => {
         runPipeline(state.originalText, parseInt(mesId, 10));
-    }, state.passSnapshots, state.passNames, state.stepEdits);
+    }, state.passSnapshots, state.passNames, state.stepEdits, () => {
+        setButtonState(false);
+        isProcessing = false;
+    });
 }
 
 // Startup
@@ -1303,7 +1318,10 @@ jQuery(async () => {
                         }
                         setButtonState(false);
                         isProcessing = false;
-                    }, _passSnapshots, _passNames);
+                    }, _passSnapshots, _passNames, null, () => {
+                        setButtonState(false);
+                        isProcessing = false;
+                    });
                 }, 500);
             } else {
                 // When not intercepted, runPipeline already showed the diff modal

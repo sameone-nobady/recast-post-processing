@@ -2,8 +2,6 @@
 // Word-level diff rendering and review modal management.
 // sponsored by claude the goat
 
-import { setSendButtonState } from "../../../../../script.js";
-
 /// Helpers
 
 function escapeHtml(str) {
@@ -268,6 +266,7 @@ function computeWordDiffDirect(oldText, newText) {
 
 let _acceptCallback = null;
 let _rejectCallback = null;
+let _closeCallback = null;
 
 // Step navigation state
 let _steps = null;
@@ -451,9 +450,10 @@ function saveEdit() {
 
 //
 
-export function showDiffModal(originalText, transformedText, onAccept, onReject = null, passSnapshots = null, passNames = null, savedStepEdits = null) {
+export function showDiffModal(originalText, transformedText, onAccept, onReject = null, passSnapshots = null, passNames = null, savedStepEdits = null, onClose = null) {
     _acceptCallback = onAccept;
     _rejectCallback = onReject;
+    _closeCallback = onClose;
     _currentStep = 0;
     _stepEdits = savedStepEdits || {}; // Restore saved edits or start fresh
 
@@ -494,8 +494,8 @@ export function showDiffModal(originalText, transformedText, onAccept, onReject 
 export function hideDiffModal(isReject = false) {
     if (isReject && typeof _rejectCallback === "function") {
         _rejectCallback();
-    } else {
-        setSendButtonState(false);
+    } else if (typeof _closeCallback === "function") {
+        _closeCallback();
     }
     _steps = null;
     _currentStep = 0;
