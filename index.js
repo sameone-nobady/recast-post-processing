@@ -11,7 +11,7 @@ import { loadSettings, saveSettings, defaultSettings, initSettingsListeners } fr
 export { loadSettings, saveSettings, defaultSettings };
 
 // Self Util
-import { showDiffModal, initDiffViewer } from "./util/diffViewer.js";
+import { showDiffModal, hideDiffModal, initDiffViewer, getStepEdits } from "./util/diffViewer.js";
 import { swapProfile } from "./util/profileSwapper.js";
 import { presetManager } from "./ui/presetManager.js";
 // Compatibility Extensions
@@ -44,6 +44,9 @@ const PassResults = {};
 let LatestResult = "";
 let _passSnapshots = [];
 let _passNames = [];
+
+// Per-message state storage for diff viewer
+const _messageStates = {};
 
 // Base functions
 // Utility to get ST variables
@@ -680,11 +683,14 @@ export async function runPipeline(originalText, messageId, skipHide = false, pre
 
         // Run regex on result
         const RegexedResult = applySTRegex(RawPassResult);
+        
+        // Run auto delete on result
+        const AutoDeleteResult = applyAutoDelete(RegexedResult);
 
-        if (RegexedResult.trim().length === 0) {
-            logDebug(`Pass ${pass.name}: result was empty after ST regex — keeping previous text.`);
+        if (AutoDeleteResult.trim().length === 0) {
+            logDebug(`Pass ${pass.name}: result was empty after auto delete — keeping previous text.`);
         } else {
-            currentText = RegexedResult;
+            currentText = AutoDeleteResult;
         }
 
         PassResults[pass.id] = currentText;
@@ -739,37 +745,46 @@ export async function runPipeline(originalText, messageId, skipHide = false, pre
         return { skipped: true, reason: 'zero_passes' };
     }
     
-    // When skipHide is active, the caller (MESSAGE_RECEIVED) handles typewriter display and saving.
+    // Always save state and update icon
+    logDebug("Pipeline finished, saving state for mesId:", currentMessageId);
+    if (currentMessageId !== null) {
+        _messageStates[currentMessageId] = {
+            originalText: originalFullText,
+            transformedText: finalFullText,
+            passSnapshots: [..._passSnapshots],
+            passNames: [..._passNames],
+            stepEdits: {},
+            state: "blue"
+        };
+    }
+
+    // Restore original text
+    if (currentMessageId !== null) {
+        const msg = getST().chat[currentMessageId];
+        if (msg) {
+            msg.mes = originalFullText;
+            safeUpdateMessageText(currentMessageId, msg);
+        }
+    }
+
+    // Update icon AFTER safeUpdateMessageText
+    logDebug("Updating button state to blue for mesId:", currentMessageId);
+    if (currentMessageId !== null) {
+        updateMessageButtonState(currentMessageId, "blue");
+    }
+
+    // When skipHide is active, the caller (MESSAGE_RECEIVED) handles the diff modal
     if (skipHide) {
-        // isProcessing is handled by the caller in this case
+        logDebug("skipHide is true, returning early");
         return finalFullText;
     }
 
-    if (extension_settings[extensionName].hide_until_last && currentMessageId !== null) {
-        if (extension_settings[extensionName].replace_inline) {
-            const msg = getST().chat[currentMessageId];
-            if (msg) {
-                msg.mes = finalFullText;
-                safeUpdateMessageText(currentMessageId, msg);
-            }
-        }
-    }
-    
-    // Skip diff or not.
-    if (extension_settings[extensionName].replace_inline) {
-        acceptChanges(finalFullText);
-    } else {
-        // Restore original text so it's not showing the streamed result or blank behind the modal
-        if (currentMessageId !== null) {
-            const msg = getST().chat[currentMessageId];
-            if (msg) {
-                msg.mes = originalFullText;
-                safeUpdateMessageText(currentMessageId, msg);
-            }
-        }
-
+    // Always show diff modal for user review
+    logDebug("Showing diff modal");
+    try {
         showDiffModal(originalFullText, finalFullText, (newText) => {
-            acceptChanges(newText);
+            showAcceptWarning(currentMessageId, newText);
+            setButtonState(false);
             isProcessing = false;
         }, () => {
             if (currentMessageId !== null) {
@@ -783,6 +798,10 @@ export async function runPipeline(originalText, messageId, skipHide = false, pre
             setButtonState(false);
             isProcessing = false;
         }, _passSnapshots, _passNames);
+    } catch (e) {
+        console.error("[Recast] Error showing diff modal:", e);
+        setButtonState(false);
+        isProcessing = false;
     }
     
     return finalFullText;
@@ -818,6 +837,33 @@ function applySTRegex(text) {
     return text;
 }
 
+// AUTO DELETE
+function applyAutoDelete(text) {
+    // 字面量模式 - 直接匹配文本
+    let literalList = extension_settings[extensionName]?.auto_delete_literal;
+    if (literalList) {
+        literalList = literalList.replace(/\\n/g, '\n');
+        const escaped = literalList.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        text = text.replace(new RegExp(escaped, 'g'), '');
+    }
+    
+    // 正则模式 - 支持正则表达式
+    let deleteList = extension_settings[extensionName]?.auto_delete;
+    if (deleteList) {
+        deleteList = deleteList.replace(/\\n/g, '\n');
+        try {
+            text = text.replace(new RegExp(deleteList, 'g'), '');
+        } catch (e) {
+            console.error('Recast: Invalid regex in auto_delete:', e);
+        }
+    }
+    
+    // 清理连续空行（2行及以上变1行）
+    text = text.replace(/\n{3,}/g, '\n\n');
+    
+    return text;
+}
+
 // MACROS
 // Register Recast macros with ST's MacrosParser.
 // {{recast_latest}}        — full text output from the last completed pipeline run
@@ -839,6 +885,136 @@ function registerMacros() {
     });
 
     logDebug("Macros registered:", ["recast_latest", ...Passes.map(p => `recast_${p.id}`)]);
+}
+
+// Message button state management (module-level so runPipeline can access)
+function updateMessageButtonState(mesId, state) {
+    const mesIdStr = String(mesId);
+    const mesEl = $(`.mes[mesid="${mesIdStr}"]`);
+    const btn = mesEl.find(".recast-msg-btn");
+    btn.removeClass("recast-state-blue recast-state-green");
+    if (state === "blue") {
+        btn.addClass("recast-state-blue");
+    } else if (state === "green") {
+        btn.addClass("recast-state-green");
+    }
+}
+
+function saveMessageStates() {
+    extension_settings[extensionName].messageStates = { ..._messageStates };
+    saveSettingsDebounced();
+}
+
+function showAcceptWarning(mesId, newText) {
+    const dialogHtml = `
+        <div id="recast_accept_warning" class="recast-dialog-backdrop" style="display:none;">
+            <div class="recast-dialog-wrapper">
+                <div class="rc-diff-header">
+                    <span class="rc-diff-title">Confirm Apply Changes</span>
+                    <button id="recast_accept_close" class="rc-diff-close-btn" title="Cancel"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+                <div class="recast-dialog-body">Cannot re-select after confirmation.</div>
+                <div class="rc-diff-footer">
+                    <button id="recast_accept_cancel" class="menu_button red_button rc-diff-btn"><i class="fa-solid fa-xmark"></i> Cancel</button>
+                    <button id="recast_accept_confirm" class="menu_button rc-diff-btn rc-diff-accept-btn"><i class="fa-solid fa-check"></i> Confirm</button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    $("body").append(dialogHtml);
+    $("#recast_accept_warning").fadeIn(200);
+
+    $("#recast_accept_confirm").on("click", function() {
+        if (_messageStates[mesId]) {
+            _messageStates[mesId].stepEdits = getStepEdits();
+        }
+        $("#recast_accept_warning").fadeOut(200, function() { $(this).remove(); });
+        hideDiffModal(false);
+        acceptChangesForMessage(mesId, newText);
+    });
+
+    $("#recast_accept_cancel, #recast_accept_close").on("click", function() {
+        $("#recast_accept_warning").fadeOut(200, function() { $(this).remove(); });
+    });
+}
+
+function acceptChangesForMessage(mesId, newText) {
+    const st = getST();
+    const msg = st.chat[mesId];
+    if (msg) {
+        msg.mes = newText;
+        safeUpdateMessageText(parseInt(mesId, 10), msg);
+        st.saveChat();
+    }
+
+    if (_messageStates[mesId]) {
+        _messageStates[mesId].state = "green";
+        _messageStates[mesId].transformedText = newText;
+    }
+    updateMessageButtonState(mesId, "green");
+    saveMessageStates();
+}
+
+function showGreenStateOptions(mesId) {
+    const dialogHtml = `
+        <div id="recast_undo_dialog" class="recast-dialog-backdrop" style="display:none;">
+            <div class="recast-dialog-wrapper">
+                <div class="rc-diff-header">
+                    <span class="rc-diff-title">Changes Applied</span>
+                    <button id="recast_undo_close" class="rc-diff-close-btn" title="Cancel"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+                <div class="recast-dialog-body">Do you want to undo the changes?</div>
+                <div class="rc-diff-footer">
+                    <button id="recast_undo_cancel" class="menu_button red_button rc-diff-btn"><i class="fa-solid fa-xmark"></i> Cancel</button>
+                    <button id="recast_undo_confirm" class="menu_button rc-diff-btn rc-diff-accept-btn"><i class="fa-solid fa-check"></i> Undo</button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    $("body").append(dialogHtml);
+    $("#recast_undo_dialog").fadeIn(200);
+
+    $("#recast_undo_confirm").on("click", function() {
+        $("#recast_undo_dialog").fadeOut(200, function() { $(this).remove(); });
+        undoChanges(mesId);
+    });
+
+    $("#recast_undo_cancel, #recast_undo_close").on("click", function() {
+        $("#recast_undo_dialog").fadeOut(200, function() { $(this).remove(); });
+    });
+}
+
+function undoChanges(mesId) {
+    const state = _messageStates[mesId];
+    if (!state) return;
+
+    const st = getST();
+    const msg = st.chat[mesId];
+    if (msg) {
+        msg.mes = state.originalText;
+        safeUpdateMessageText(parseInt(mesId, 10), msg);
+        st.saveChat();
+    }
+
+    _messageStates[mesId].state = "grey";
+    updateMessageButtonState(mesId, "grey");
+    saveMessageStates();
+    toastr.info("Original text restored");
+}
+
+function openDiffWindow(mesId) {
+    const state = _messageStates[mesId];
+    if (!state) return;
+
+    showDiffModal(state.originalText, state.transformedText, (newText) => {
+        showAcceptWarning(mesId, newText);
+        setButtonState(false);
+        isProcessing = false;
+    }, () => {
+        runPipeline(state.originalText, parseInt(mesId, 10));
+    }, state.passSnapshots, state.passNames, state.stepEdits);
 }
 
 // Startup
@@ -863,6 +1039,12 @@ jQuery(async () => {
     $("body").append(diffBackdrop);
     $("body").append(diffModal);
     $("body").append(tempDiv.find("#recast_preset_manager_modal"));
+    
+    // Edit modal
+    const editBackdrop = tempDiv.find("#recast_edit_backdrop");
+    const editModal = tempDiv.find("#recast_edit_modal");
+    $("body").append(editBackdrop);
+    $("body").append(editModal);
     
     // Append the rest to extensions settings
     $("#extensions_settings").append(tempDiv.children());
@@ -920,6 +1102,31 @@ jQuery(async () => {
 
     injectMessageTemplateButton();
 
+    // Restore message states from saved settings
+    function restoreMessageStates() {
+        const savedStates = extension_settings[extensionName].messageStates || {};
+        for (const [mesId, state] of Object.entries(savedStates)) {
+            _messageStates[mesId] = state;
+            updateMessageButtonState(mesId, state.state);
+        }
+    }
+
+    // Restore states on load
+    restoreMessageStates();
+
+    // Re-apply state colors when new messages appear in the DOM (async chat load)
+    const chatEl = document.getElementById('chat');
+    if (chatEl) {
+        new MutationObserver((mutations) => {
+            const addedMes = mutations.some(m => [...m.addedNodes].some(n => n.nodeType === 1 && n.matches('.mes')));
+            if (addedMes) {
+                for (const mesId of Object.keys(_messageStates)) {
+                    updateMessageButtonState(mesId, _messageStates[mesId].state);
+                }
+            }
+        }).observe(chatEl, { childList: true });
+    }
+
     $(document).on("click", ".recast-msg-btn", function(e) {
         e.stopPropagation();
         if (!extension_settings[extensionName].enabled) {
@@ -938,11 +1145,27 @@ jQuery(async () => {
 
         const st = getST();
         const msg = st.chat[mesId];
-        if (msg) {
-            runPipeline(msg.mes, parseInt(mesId, 10));
-        } else {
+        if (!msg) {
             toastr.warning("Could not find message data.");
+            return;
         }
+
+        const state = _messageStates[mesId];
+
+        // Blue state: open diff window
+        if (state && state.state === "blue" && state.originalText && state.transformedText) {
+            openDiffWindow(mesId);
+            return;
+        }
+
+        // Green state: show undo option
+        if (state && state.state === "green" && state.originalText) {
+            showGreenStateOptions(mesId);
+            return;
+        }
+
+        // Grey state: run pipeline
+        runPipeline(msg.mes, parseInt(mesId, 10));
     });
 
     ///
@@ -1064,50 +1287,27 @@ jQuery(async () => {
             }
 
             if (isIntercepted) {
-                // Allow the final stream fade-in animation some time to complete
+                // When intercepted, runPipeline returned early (skipHide=true)
+                // We need to show the diff modal here after a short delay
                 setTimeout(() => {
-                    // True streaming is now done directly during the pipeline execution (runPass).
-                    // Just honour the diff/replace-inline setting for the final save.
-                    if (extension_settings[extensionName].replace_inline) {
-                        if (result === originalText) {
-                            const restoreMsg = getST().chat[mesId];
-                            if (restoreMsg) {
-                                restoreMsg.mes = originalText;
-                                safeUpdateMessageText(mesId, restoreMsg);
-                                getST().saveChat();
-                            }
-                            setButtonState(false);
-                            isProcessing = false;
-                        } else {
-                            acceptChanges(result);
-                        }
-                    } else {
-                        // Restore original text behind the modal so it's not showing the streamed result or blank
+                    showDiffModal(originalText, result, (newText) => {
+                        showAcceptWarning(mesId, newText);
+                        setButtonState(false);
+                        isProcessing = false;
+                    }, () => {
                         const restoreMsg = getST().chat[mesId];
                         if (restoreMsg) {
                             restoreMsg.mes = originalText;
                             safeUpdateMessageText(mesId, restoreMsg);
+                            getST().saveChat();
                         }
-
-                        // The UI already shows the streamed result, so we need a rejection callback to revert it
-                        showDiffModal(originalText, result, (newText) => {
-                            acceptChanges(newText);
-                            isProcessing = false;
-                        }, () => {
-                            const restoreMsgRevert = getST().chat[mesId];
-                            if (restoreMsgRevert) {
-                                restoreMsgRevert.mes = originalText;
-                                safeUpdateMessageText(mesId, restoreMsgRevert);
-                                getST().saveChat();
-                            }
-                            setButtonState(false);
-                            isProcessing = false;
-                        }, _passSnapshots, _passNames);
-                    }
-                }, 500); // 500ms delay protects the final visual update
+                        setButtonState(false);
+                        isProcessing = false;
+                    }, _passSnapshots, _passNames);
+                }, 500);
             } else {
-                // If it wasn't intercepted but we are running in MESSAGE_RECEIVED skipHide logic
-                isProcessing = false;
+                // When not intercepted, runPipeline already showed the diff modal
+                // Nothing to do here
             }
         }
 

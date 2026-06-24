@@ -72,6 +72,14 @@
                             <span style="min-width: 160px;">Min. Characters (0 = off):</span>
                             <input type="number" id="recast_min_chars" class="text_pole flex1" value="0" min="0" step="1" />
                         </div>
+                        <div class="flex-container alignitemscenter" style="margin-top: 8px;" title="Auto delete strings from text after each pass (literal match)">
+                            <span style="min-width: 160px;">Auto Delete:</span>
+                            <input type="text" id="recast_auto_delete_literal" class="text_pole flex1" placeholder="<|channel>thought" />
+                        </div>
+                        <div class="flex-container alignitemscenter" style="margin-top: 8px;" title="Auto delete strings from text after each pass (regex)">
+                            <span style="min-width: 160px;">Auto Delete (Regex):</span>
+                            <input type="text" id="recast_auto_delete" class="text_pole flex1" placeholder="hello|world" />
+                        </div>
                     </div>
                 </div>
 
@@ -134,10 +142,8 @@
         <div class="rc-diff-panel">
             <div class="rc-diff-panel-header rc-diff-transformed-header">
                 <i class="fa-solid fa-wand-sparkles"></i> <span class="rc-diff-panel-label">Transformed</span>
-                <span class="rc-diff-edit-hint">(editable)</span>
             </div>
             <div id="recast_diff_transformed_view" class="rc-diff-content rc-diff-transformed-content"></div>
-            <textarea id="recast_diff_transformed" class="rc-diff-textarea text_pole"></textarea>
         </div>
     </div>
     <!-- Step Navigation -->
@@ -150,8 +156,25 @@
         <div id="recast_diff_step_label" class="rc-diff-step-label">Full Diff</div>
     </div>
     <div class="rc-diff-footer">
-        <button id="recast_diff_reject" class="menu_button red_button rc-diff-btn"><i class="fa-solid fa-xmark"></i> Reject</button>
+        <button id="recast_diff_reject" class="menu_button rc-diff-btn rc-diff-refresh-btn"><i class="fa-solid fa-rotate"></i> Refresh</button>
+        <button id="recast_diff_edit" class="menu_button rc-diff-btn rc-diff-edit-btn"><i class="fa-solid fa-pen"></i> Edit</button>
         <button id="recast_diff_accept" class="menu_button rc-diff-btn rc-diff-accept-btn"><i class="fa-solid fa-check"></i> Accept</button>
+    </div>
+</div>
+
+<!-- Edit Modal -->
+<div id="recast_edit_backdrop" style="display:none;"></div>
+<div id="recast_edit_modal" style="display:none;">
+    <div class="rc-diff-header rc-edit-header">
+        <span class="rc-diff-title"><i class="fa-solid fa-pen-to-square"></i> Edit Text</span>
+        <button id="recast_edit_close" class="rc-diff-close-btn" title="Close without saving"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="rc-edit-body">
+        <textarea id="recast_edit_textarea" class="rc-edit-textarea text_pole" placeholder="Edit your text here..."></textarea>
+    </div>
+    <div class="rc-diff-footer">
+        <button id="recast_edit_cancel" class="menu_button red_button rc-diff-btn"><i class="fa-solid fa-xmark"></i> Cancel</button>
+        <button id="recast_edit_save" class="menu_button rc-diff-btn rc-diff-accept-btn"><i class="fa-solid fa-check"></i> Save</button>
     </div>
 </div>
 

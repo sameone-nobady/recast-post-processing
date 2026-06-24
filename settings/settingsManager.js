@@ -12,10 +12,12 @@ export const defaultSettings = {
     hide_until_last: true, // Skips all message edit and hides the message until pipeline is about to end
     stream_pipeline: true, // Streaming, has to have default sillystreaming enabled too
     debug_mode: false,
-    disable_editable_diff: true, // Disables the edit field in the diff viewer
+    disable_editable_diff: false, // Disables the edit field in the diff viewer
     legacy_api: false, // Swaps profiles and waits for them before doing the request, useful for fixing some issues with root ST code
-    compatibility_mode: false, // Enables compatibility fixes for other extensions
+    compatibility_mode: false, // Enables compatibility fixes for other extensions like Stepped Thinking
     min_chars: 60, // Skips if there's not enough characters. Useful for preventing rejections or shortcomings from triggering pipeline
+    auto_delete: "", // Auto delete strings from text after each pass, supports regex, e.g. "hello|world"
+    auto_delete_literal: "", // Auto delete strings from text after each pass, literal match, e.g. "<|channel>thought"
     
     presets: defaultPresets,
     active_preset: "Default Preset"
@@ -23,7 +25,7 @@ export const defaultSettings = {
 
 export function initSettingsListeners() {
     $("#recast_enabled, #recast_autorun, #recast_inject, #recast_replace_inline, #recast_hide_until_last, #recast_stream_pipeline, #recast_debug_mode, #recast_disable_editable_diff, #recast_legacy_api, #recast_compatibility").on("change", saveSettings);
-    $("#recast_min_chars").on("input change", saveSettings);
+    $("#recast_min_chars, #recast_auto_delete, #recast_auto_delete_literal").on("input change", saveSettings);
 
     // Compatibility warn
     $("#recast_compatibility").on("change", function() {
@@ -50,6 +52,8 @@ export async function loadSettings() {
     $("#recast_legacy_api").prop("checked", extension_settings[extensionName].legacy_api);
     $("#recast_compatibility").prop("checked", extension_settings[extensionName].compatibility_mode);
     $("#recast_min_chars").val(extension_settings[extensionName].min_chars ?? 0);
+    $("#recast_auto_delete").val(extension_settings[extensionName].auto_delete ?? "");
+    $("#recast_auto_delete_literal").val(extension_settings[extensionName].auto_delete_literal ?? "");
 
     presetManager.populatePresetDropdown();
     presetManager.loadActivePreset();
@@ -67,6 +71,8 @@ export function saveSettings() {
     extension_settings[extensionName].legacy_api = $("#recast_legacy_api").prop("checked");
     extension_settings[extensionName].compatibility_mode = $("#recast_compatibility").prop("checked");
     extension_settings[extensionName].min_chars = parseInt($("#recast_min_chars").val(), 10) || 0;
+    extension_settings[extensionName].auto_delete = $("#recast_auto_delete").val();
+    extension_settings[extensionName].auto_delete_literal = $("#recast_auto_delete_literal").val();
     
     presetManager.saveActivePreset();
     saveSettingsDebounced();

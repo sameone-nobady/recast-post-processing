@@ -12,9 +12,53 @@ function escapeHtml(str) {
         .replace(/>/g, "&gt;");
 }
 
-// Split text into tokens: words and whitespace, preserving round-trip fidelity
+// Split text into tokens: Chinese characters individually, English words as units, preserving whitespace
 function tokenize(text) {
-    return text.split(/(\s+)/);
+    return text.match(/[\u4e00-\u9fff\u3400-\u4dbf\uf900-\ufaff]|[a-zA-Z0-9]+|[^\s\u4e00-\u9fff\u3400-\u4dbf\uf900-\ufaffa-zA-Z0-9]+|\s+/g) || [];
+}
+
+// Split text into sentences (supports Chinese and English punctuation)
+function tokenizeSentences(text) {
+    // Match sentence-ending punctuation, keep it attached to the sentence
+    return text.match(/[^。！？；.!?;]+[。！？；.!?;]?/g) || [text];
+}
+
+// Word-level diff for a single sentence pair, returns { oldHtml, newHtml }
+function computeWordDiffForSentence(oldSent, newSent) {
+    const a = tokenize(oldSent);
+    const b = tokenize(newSent);
+
+    // Common prefix
+    let start = 0;
+    while (start < a.length && start < b.length && a[start] === b[start]) start++;
+
+    // Common suffix
+    let endA = a.length - 1, endB = b.length - 1;
+    while (endA >= start && endB >= start && a[endA] === b[endB]) { endA--; endB--; }
+
+    const subA = a.slice(start, endA + 1);
+    const subB = b.slice(start, endB + 1);
+
+    let ops = myersDiff(subA, subB);
+    if (!ops) {
+        ops = [...subA.map(v => ({ type: "delete", v })), ...subB.map(v => ({ type: "insert", v }))];
+    }
+
+    const fullOps = [
+        ...a.slice(0, start).map(v => ({ type: "equal", v })),
+        ...ops,
+        ...a.slice(endA + 1).map(v => ({ type: "equal", v }))
+    ];
+
+    let oldHtml = "", newHtml = "";
+    for (const op of fullOps) {
+        if (op.v === undefined || op.v === null) continue;
+        const v = escapeHtml(op.v);
+        if (op.type === "equal")        { oldHtml += v; newHtml += v; }
+        else if (op.type === "delete")  { oldHtml += `<del class="rc-del">${v}</del>`; }
+        else                            { newHtml += `<ins class="rc-ins">${v}</ins>`; }
+    }
+    return { oldHtml, newHtml };
 }
 
 //
@@ -111,41 +155,96 @@ function myersDiff(oldTokens, newTokens) {
 }
 
 function computeWordDiff(oldText, newText) {
+    const oldSentences = tokenizeSentences(oldText);
+    const newSentences = tokenizeSentences(newText);
+
+    // Sentence-level diff
+    let sentenceOps = myersDiff(oldSentences, newSentences);
+    if (!sentenceOps) {
+        sentenceOps = [
+            ...oldSentences.map(v => ({ type: "delete", v })),
+            ...newSentences.map(v => ({ type: "insert", v }))
+        ];
+    }
+
+    // Group consecutive delete/insert ops into blocks, then pair them for word-level diff
+    let oldHtml = "", newHtml = "";
+    let i = 0;
+    while (i < sentenceOps.length) {
+        const op = sentenceOps[i];
+
+        if (op.type === "equal") {
+            const v = escapeHtml(op.v);
+            oldHtml += v;
+            newHtml += v;
+            i++;
+        } else if (op.type === "delete") {
+            // Collect consecutive deletes
+            const deletes = [];
+            while (i < sentenceOps.length && sentenceOps[i].type === "delete") {
+                deletes.push(sentenceOps[i].v);
+                i++;
+            }
+            // Collect consecutive inserts
+            const inserts = [];
+            while (i < sentenceOps.length && sentenceOps[i].type === "insert") {
+                inserts.push(sentenceOps[i].v);
+                i++;
+            }
+            // Pair deletes and inserts for word-level diff
+            const pairCount = Math.min(deletes.length, inserts.length);
+            for (let p = 0; p < pairCount; p++) {
+                const result = computeWordDiffForSentence(deletes[p], inserts[p]);
+                oldHtml += result.oldHtml;
+                newHtml += result.newHtml;
+            }
+            // Unpaired deletes
+            for (let d = pairCount; d < deletes.length; d++) {
+                oldHtml += `<del class="rc-del">${escapeHtml(deletes[d])}</del>`;
+            }
+            // Unpaired inserts
+            for (let p = pairCount; p < inserts.length; p++) {
+                newHtml += `<ins class="rc-ins">${escapeHtml(inserts[p])}</ins>`;
+            }
+        } else if (op.type === "insert") {
+            newHtml += `<ins class="rc-ins">${escapeHtml(op.v)}</ins>`;
+            i++;
+        } else {
+            i++;
+        }
+    }
+
+    // Fallback: if sentence tokenizer produced no visible diff but texts differ
+    if (oldHtml === "" && newHtml === "" && oldText !== newText) {
+        return computeWordDiffDirect(oldText, newText);
+    }
+
+    return { oldHtml, newHtml };
+}
+
+// Direct word-level diff (original logic for fallback)
+function computeWordDiffDirect(oldText, newText) {
     const a = tokenize(oldText);
     const b = tokenize(newText);
 
-    // Graceful fallback for very large texts — skip highlighting
     if (a.length > MAX_DIFF_TOKENS || b.length > MAX_DIFF_TOKENS) {
         return { oldHtml: escapeHtml(oldText), newHtml: escapeHtml(newText) };
     }
 
-    // Optimization 1: Strip common prefix
     let start = 0;
-    while (start < a.length && start < b.length && a[start] === b[start]) {
-        start++;
-    }
+    while (start < a.length && start < b.length && a[start] === b[start]) start++;
 
-    // Optimization 2: Strip common suffix
-    let endA = a.length - 1;
-    let endB = b.length - 1;
-    while (endA >= start && endB >= start && a[endA] === b[endB]) {
-        endA--;
-        endB--;
-    }
+    let endA = a.length - 1, endB = b.length - 1;
+    while (endA >= start && endB >= start && a[endA] === b[endB]) { endA--; endB--; }
 
     const subA = a.slice(start, endA + 1);
     const subB = b.slice(start, endB + 1);
 
     let ops = myersDiff(subA, subB);
     if (!ops) {
-        // Fallback if diff is too divergent
-        ops = [
-            ...subA.map(v => ({ type: "delete", v })),
-            ...subB.map(v => ({ type: "insert", v }))
-        ];
+        ops = [...subA.map(v => ({ type: "delete", v })), ...subB.map(v => ({ type: "insert", v }))];
     }
 
-    // Reconstruct operations including common prefix and suffix
     const fullOps = [
         ...a.slice(0, start).map(v => ({ type: "equal", v })),
         ...ops,
@@ -160,7 +259,6 @@ function computeWordDiff(oldText, newText) {
         else if (op.type === "delete")  { oldHtml += `<del class="rc-del">${v}</del>`; }
         else                            { newHtml += `<ins class="rc-ins">${v}</ins>`; }
     }
-
     return { oldHtml, newHtml };
 }
 
@@ -172,6 +270,7 @@ let _rejectCallback = null;
 // Step navigation state
 let _steps = null;
 let _currentStep = 0;
+let _stepEdits = {}; // Track edits per step: { stepIndex: editedText }
 
 import { extension_settings } from "../../../../extensions.js";
 
@@ -223,11 +322,21 @@ function renderStep(stepIndex) {
     _currentStep = stepIndex;
 
     const step = _steps[stepIndex];
-    const disableEditable = extension_settings["Recast"] && extension_settings["Recast"].disable_editable_diff;
+    const lastStepIndex = _steps.length - 1;
 
-    // Step 0 uses live textarea value to respect any user edits made since opening
-    const newText = stepIndex === 0 ? ($("#recast_diff_transformed").val() || step.newText) : step.newText;
-    const { oldHtml, newHtml } = computeWordDiff(step.oldText, newText);
+    // Resolve oldText: if previous step was edited, use that edit as the base
+    let oldText = step.oldText;
+    if (stepIndex > 1 && _stepEdits[stepIndex - 1] !== undefined) {
+        oldText = _stepEdits[stepIndex - 1];
+    }
+
+    // Resolve newText: use step edit if available
+    let newText = step.newText;
+    if (_stepEdits[stepIndex] !== undefined) {
+        newText = _stepEdits[stepIndex];
+    }
+
+    const { oldHtml, newHtml } = computeWordDiff(oldText, newText);
 
     // Update panel content
     $("#recast_diff_original_view").html(oldHtml);
@@ -236,17 +345,6 @@ function renderStep(stepIndex) {
     // Update panel header labels
     $(".rc-diff-original-header .rc-diff-panel-label").text(step.oldLabel);
     $(".rc-diff-transformed-header .rc-diff-panel-label").text(step.newLabel);
-
-    // Textarea is editable only on step 0 (the full-diff / accept view)
-    if (stepIndex === 0 && !disableEditable) {
-        $("#recast_diff_transformed").show();
-        $("#recast_diff_transformed_view").css({ "height": "", "flex": "" });
-        $(".rc-diff-edit-hint").show();
-    } else {
-        $("#recast_diff_transformed").hide();
-        $("#recast_diff_transformed_view").css({ "height": "100%", "flex": "1 1 auto" });
-        $(".rc-diff-edit-hint").hide();
-    }
 
     // Update active dot
     $(".rc-diff-dot").removeClass("rc-diff-dot-active");
@@ -286,17 +384,90 @@ function renderNavigation() {
     stepsBar.show();
 }
 
-export function showDiffModal(originalText, transformedText, onAccept, onReject = null, passSnapshots = null, passNames = null) {
+// Get the current text for the active step (with any edits applied)
+function getCurrentStepText() {
+    if (_steps && _currentStep >= 0 && _currentStep < _steps.length) {
+        if (_stepEdits[_currentStep] !== undefined) {
+            return _stepEdits[_currentStep];
+        }
+        return _steps[_currentStep].newText;
+    }
+    return $("#recast_diff_transformed_view").text();
+}
+
+// Edit modal functions
+function openEditModal() {
+    const currentText = getCurrentStepText();
+    $("#recast_edit_textarea").val(currentText);
+    $("#recast_edit_backdrop").fadeIn(150);
+    $("#recast_edit_modal").fadeIn(180);
+    $("#recast_edit_textarea").focus();
+}
+
+function closeEditModal() {
+    $("#recast_edit_backdrop").fadeOut(120);
+    $("#recast_edit_modal").fadeOut(150);
+}
+
+function saveEdit() {
+    const newText = $("#recast_edit_textarea").val();
+    _stepEdits[_currentStep] = newText;
+
+    // Bidirectional sync: keep step 0 and last step in sync
+    if (_steps) {
+        const lastStepIndex = _steps.length - 1;
+        if (_currentStep === 0 && lastStepIndex >= 0) {
+            _stepEdits[lastStepIndex] = newText;
+        } else if (_currentStep === lastStepIndex && lastStepIndex >= 0) {
+            _stepEdits[0] = newText;
+        }
+    }
+
+    // Re-render the current step with the new text
+    if (_steps && _currentStep >= 0 && _currentStep < _steps.length) {
+        const lastStepIndex = _steps.length - 1;
+
+        // Resolve oldText: if previous step was edited, use that edit as the base
+        let oldText = _steps[_currentStep].oldText;
+        if (_currentStep > 1 && _stepEdits[_currentStep - 1] !== undefined) {
+            oldText = _stepEdits[_currentStep - 1];
+        }
+
+        const { oldHtml, newHtml } = computeWordDiff(oldText, newText);
+        $("#recast_diff_original_view").html(oldHtml);
+        $("#recast_diff_transformed_view").html(newHtml);
+    } else {
+        // Single-view mode
+        const rawOriginal = $("#recast_diff_modal").data("original") || "";
+        const { oldHtml, newHtml } = computeWordDiff(rawOriginal, newText);
+        $("#recast_diff_original_view").html(oldHtml);
+        $("#recast_diff_transformed_view").html(newHtml);
+    }
+
+    closeEditModal();
+}
+
+//
+
+export function showDiffModal(originalText, transformedText, onAccept, onReject = null, passSnapshots = null, passNames = null, savedStepEdits = null) {
     _acceptCallback = onAccept;
     _rejectCallback = onReject;
     _currentStep = 0;
+    _stepEdits = savedStepEdits || {}; // Restore saved edits or start fresh
 
     // Build navigation steps when 2+ passes are present
     _steps = (passSnapshots && passSnapshots.length >= 3) ? buildSteps(passSnapshots, passNames) : null;
 
-    // Store original text and pre-fill textarea
+    // Store original text
     $("#recast_diff_modal").data("original", originalText);
-    $("#recast_diff_transformed").val(transformedText);
+
+    // Show/hide edit button based on setting
+    const disableEditable = extension_settings["Recast"] && extension_settings["Recast"].disable_editable_diff;
+    if (disableEditable) {
+        $("#recast_diff_edit").hide();
+    } else {
+        $("#recast_diff_edit").show();
+    }
 
     if (_steps) {
         renderNavigation();
@@ -311,16 +482,6 @@ export function showDiffModal(originalText, transformedText, onAccept, onReject 
         $(".rc-diff-original-header .rc-diff-panel-label").text("Original");
         $(".rc-diff-transformed-header .rc-diff-panel-label").text("Transformed");
 
-        if (extension_settings["Recast"] && extension_settings["Recast"].disable_editable_diff) {
-            $("#recast_diff_transformed").hide();
-            $("#recast_diff_transformed_view").css({ "height": "100%", "flex": "1 1 auto" });
-            $(".rc-diff-edit-hint").hide();
-        } else {
-            $("#recast_diff_transformed").show();
-            $("#recast_diff_transformed_view").css({ "height": "", "flex": "" });
-            $(".rc-diff-edit-hint").show();
-        }
-
         $("#recast_diff_steps").hide();
     }
 
@@ -334,37 +495,30 @@ export function hideDiffModal(isReject = false) {
     }
     _steps = null;
     _currentStep = 0;
+    _stepEdits = {};
     $("#recast_diff_backdrop").fadeOut(180);
     $("#recast_diff_modal").fadeOut(200);
 }
 
 export function initDiffViewer() {
+    // Accept button — use the text from the last rendered diff view
     $("#recast_diff_accept").on("click", () => {
-        const text = $("#recast_diff_transformed").val();
+        const text = getCurrentStepText();
         if (typeof _acceptCallback === "function") _acceptCallback(text);
-        hideDiffModal(false);
+        // Don't close modal here - let the callback handle it (e.g., warning dialog)
     });
 
-    $("#recast_diff_reject, #recast_diff_close").on("click", () => hideDiffModal(true));
+    $("#recast_diff_reject").on("click", () => hideDiffModal(true));
 
-    $("#recast_diff_backdrop").on("click", () => hideDiffModal(true));
+    $("#recast_diff_close, #recast_diff_backdrop").on("click", () => hideDiffModal(false));
 
-    // Live diff — recompute highlights as the user edits the transformed textarea
-    $("#recast_diff_transformed").on("input", function () {
-        if (_steps) {
-            // Only update when on step 0 (textarea is hidden on other steps anyway)
-            if (_currentStep === 0) {
-                const { oldHtml, newHtml } = computeWordDiff(_steps[0].oldText, $(this).val());
-                $("#recast_diff_original_view").html(oldHtml);
-                $("#recast_diff_transformed_view").html(newHtml);
-            }
-        } else {
-            const rawOriginal = $("#recast_diff_modal").data("original") || "";
-            const { oldHtml, newHtml } = computeWordDiff(rawOriginal, $(this).val());
-            $("#recast_diff_original_view").html(oldHtml);
-            $("#recast_diff_transformed_view").html(newHtml);
-        }
-    });
+    // Edit button — open edit modal
+    $("#recast_diff_edit").on("click", () => openEditModal());
+
+    // Edit modal — save/cancel/close
+    $("#recast_edit_save").on("click", () => saveEdit());
+    $("#recast_edit_cancel, #recast_edit_close").on("click", () => closeEditModal());
+    $("#recast_edit_backdrop").on("click", () => closeEditModal());
 
     // Step navigation — prev/next arrows
     $("#recast_diff_prev").on("click", () => {
@@ -379,4 +533,9 @@ export function initDiffViewer() {
     $(document).on("click", "#recast_diff_dots .rc-diff-dot", function () {
         if (_steps) renderStep(parseInt($(this).data("step"), 10));
     });
+}
+
+// Export function to get current step edits
+export function getStepEdits() {
+    return { ..._stepEdits };
 }
