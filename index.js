@@ -658,7 +658,6 @@ export async function runPipeline(originalText, messageId, skipHide = false, pre
                         } else {
                             mesTextEl.innerHTML = formattedText;
                         }
-                        scrollChatToBottom({ waitForFrame: true });
                     } else if (mesEl) {
                         updateMessageBlock(currentMessageId, msg);
                     }
@@ -757,6 +756,7 @@ export async function runPipeline(originalText, messageId, skipHide = false, pre
             state: "blue"
         };
     }
+    saveMessageStates();
 
     // Restore original text
     if (currentMessageId !== null) {
