@@ -842,27 +842,31 @@ function applySTRegex(text) {
 
 // AUTO DELETE
 function applyAutoDelete(text) {
-    // 字面量模式 - 直接匹配文本
+    // 字面量模式 - 按 ";" 分割，每个 item 单独匹配
     let literalList = extension_settings[extensionName]?.auto_delete_literal;
     if (literalList) {
         literalList = literalList.replace(/\\n/g, '\n');
-        const escaped = literalList.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        text = text.replace(new RegExp(escaped, 'g'), '');
-    }
-    
-    // 正则模式 - 支持正则表达式
-    let deleteList = extension_settings[extensionName]?.auto_delete;
-    if (deleteList) {
-        deleteList = deleteList.replace(/\\n/g, '\n');
-        try {
-            text = text.replace(new RegExp(deleteList, 'g'), '');
-        } catch (e) {
-            console.error('Recast: Invalid regex in auto_delete:', e);
+        const items = literalList.split(';').map(s => s.trim()).filter(Boolean);
+        for (const item of items) {
+            const escaped = item.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            text = text.replace(new RegExp(escaped, 'g'), '');
         }
     }
     
-    // 清理连续空行（2行及以上变1行）
-    text = text.replace(/\n{3,}/g, '\n\n');
+    // 正则模式 - 按 ";" 分割，每个 item 单独作为正则
+    let deleteList = extension_settings[extensionName]?.auto_delete;
+    if (deleteList) {
+        deleteList = deleteList.replace(/\\n/g, '\n');
+        const items = deleteList.split(';').map(s => s.trim()).filter(Boolean);
+        for (const item of items) {
+            try {
+                text = text.replace(new RegExp(item, 'g'), '');
+            } catch (e) {
+                console.error('Recast: Invalid regex in auto_delete:', item, e);
+            }
+        }
+    }
+    
     
     return text;
 }
